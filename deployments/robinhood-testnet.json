@@ -1,0 +1,13 @@
+{
+  "chainId": 46630,
+  "chainName": "Robinhood Chain Testnet",
+  "deployer": "0xE24a4342fE047321Ed8bb1a4571bF87B55646680",
+  "deployedAt": "2026-05-27",
+  "equityTokenFactory": "0xcD238464cFE2901aF24e6d77585a19C2064Ca62A",
+  "mockVesting": "0x1a8F98b493d6c66d255536701c4Eb7E6553e288C",
+  "demoEquityToken": "0xAce3a7b296E41B03bC77e91D2a0375B4Ea279B80",
+  "demoCapTable": "0x5e9bb5A815d2D6A81CAb1160f0A3b8BA35b4313D",
+  "vestingContract": "0x1a8F98b493d6c66d255536701c4Eb7E6553e288C",
+  "note": "mockVesting is a Solidity placeholder. Will be replaced with Stylus (Rust) address once cargo-stylus is installed and deployed.",
+  "explorer": "https://explorer.testnet.chain.robinhood.com"
+}
