@@ -34,3 +34,7 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# npm lock file — generated locally with absolute workspace paths
+# Vercel will regenerate it cleanly during build
+package-lock.json
