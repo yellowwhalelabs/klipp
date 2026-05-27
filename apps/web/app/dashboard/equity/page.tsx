@@ -26,14 +26,14 @@ const DEMO_GRANTS = [
 ];
 
 export default function EquityDashboardPage() {
-  const { ready, authenticated, user } = usePrivy();
+  const { ready, authenticated } = usePrivy();
   const router = useRouter();
 
   useEffect(() => {
     if (ready && !authenticated) router.push("/onboard");
   }, [ready, authenticated, router]);
 
-  async function handleClaim(grantId: bigint) {
+  async function handleClaim(_grantId: bigint) {
     toast.promise(
       new Promise((r) => setTimeout(r, 2000)), // TODO: replace with actual tx
       {

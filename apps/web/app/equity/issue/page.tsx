@@ -44,7 +44,7 @@ export default function IssueEquityPage() {
     },
   });
 
-  async function onSubmit(data: FormData) {
+  async function onSubmit(_data: FormData) {
     setSubmitting(true);
     try {
       // TODO: call CapTable.issueGrant() via Privy wallet + viem

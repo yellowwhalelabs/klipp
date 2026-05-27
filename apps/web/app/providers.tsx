@@ -64,8 +64,9 @@ export function Providers({ children }: { children: React.ReactNode }) {
       config={{
         loginMethods: ["email", "google", "apple", "passkey"],
         embeddedWallets: {
-          createOnLogin: "users-without-wallets",
-          requireUserPasswordOnCreate: false,
+          ethereum: {
+            createOnLogin: "users-without-wallets",
+          },
         },
         appearance: {
           theme: "dark",

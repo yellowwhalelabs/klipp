@@ -44,9 +44,10 @@ export default function OnboardPage() {
 
       // In production: upload metadata to Supabase Storage, get URI, call contract
       // For now: use data URI for demo
-      const metadataURI = `data:application/json;base64,${btoa(JSON.stringify(metadata))}`;
-
       // TODO: call SoulboundCard.mint(metadataURI) via viem + Privy wallet
+      // Upload metadata to Supabase Storage, get URI, then call contract
+      const _metadataURI = `data:application/json;base64,${btoa(JSON.stringify(metadata))}`;
+      void _metadataURI; // used in real mint call below
       // Simulating for now
       await new Promise((r) => setTimeout(r, 2000));
 
@@ -54,7 +55,7 @@ export default function OnboardPage() {
       setStep("done");
 
       setTimeout(() => router.push("/dashboard"), 2000);
-    } catch (err) {
+    } catch {
       toast.error("Minting failed. Try again.");
       setStep("profile");
     } finally {
