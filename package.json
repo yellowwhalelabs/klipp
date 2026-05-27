@@ -1,0 +1,22 @@
+{
+  "name": "klipp",
+  "version": "0.1.0",
+  "private": true,
+  "description": "KLIPP — on-chain identity: soulbound cards, verified credentials, and tokenized equity",
+  "license": "MIT",
+  "packageManager": "pnpm@9.15.9",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "pnpm --filter web dev",
+    "build": "pnpm --filter web build",
+    "test": "pnpm --filter '{contracts/**}' test",
+    "lint": "pnpm -r lint",
+    "typecheck": "pnpm -r typecheck"
+  },
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ]
+}

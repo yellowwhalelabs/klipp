@@ -1,0 +1,46 @@
+# Dependencies
+node_modules
+.pnpm-store
+
+# Environment
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# Build output
+.next
+out
+dist
+build
+coverage
+
+# Foundry
+contracts/solidity/out
+contracts/solidity/cache
+contracts/solidity/broadcast
+contracts/solidity/lib
+
+# Rust / Stylus
+contracts/stylus/target
+contracts/stylus/**/*.lock
+
+# Vercel
+.vercel
+
+# Supabase
+supabase/.branches
+supabase/.temp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea
+.vscode
+*.swp
+
+# Logs
+*.log
+npm-debug.log*
