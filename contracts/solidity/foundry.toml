@@ -1,0 +1,21 @@
+[profile.default]
+src = "src"
+out = "out"
+libs = ["lib"]
+test = "test"
+script = "script"
+solc = "0.8.24"
+optimizer = true
+optimizer_runs = 200
+remappings = [
+    "@openzeppelin/=lib/openzeppelin-contracts/",
+    "forge-std/=lib/forge-std/src/"
+]
+
+[rpc_endpoints]
+arbitrum_sepolia = "https://sepolia-rollup.arbitrum.io/rpc"
+robinhood_testnet = "${ROBINHOOD_TESTNET_RPC}"
+
+[etherscan]
+arbitrum_sepolia = { key = "PLACEHOLDER_ARBISCAN_KEY", url = "https://api-sepolia.arbiscan.io/api" }
+robinhood_testnet = { key = "any", url = "https://explorer.testnet.chain.robinhood.com/api" }
