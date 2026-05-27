@@ -9,7 +9,7 @@ import "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
 ///         a holder's wallet address. Issuers (employers, schools, cert bodies)
 ///         sign typed-data claims off-chain; anyone can submit the signature on-chain.
 ///         Deployed on Arbitrum Sepolia.
-contract ProCard is EIP712 {
+contract KLIPPProCard is EIP712 {
     using ECDSA for bytes32;
 
     // ─────────────────────────────────────────────────────────────

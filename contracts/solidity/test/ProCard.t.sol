@@ -4,8 +4,8 @@ pragma solidity ^0.8.24;
 import "forge-std/Test.sol";
 import "../src/ProCard.sol";
 
-contract ProCardTest is Test {
-    ProCard proCard;
+contract KLIPPProCardTest is Test {
+    KLIPPProCard proCard;
     address alice   = makeAddr("alice");   // holder
     uint256 issuerPk = 0xDEADBEEF;
     address issuer;
@@ -16,7 +16,7 @@ contract ProCardTest is Test {
     );
 
     function setUp() public {
-        proCard = new ProCard();
+        proCard = new KLIPPProCard();
         issuer  = vm.addr(issuerPk);
     }
 
@@ -48,7 +48,7 @@ contract ProCardTest is Test {
         uint256 idx = proCard.addClaim(alice, claimHash, sig);
         assertEq(idx, 0);
 
-        ProCard.Claim[] memory claims = proCard.getClaims(alice);
+        KLIPPProCard.Claim[] memory claims = proCard.getClaims(alice);
         assertEq(claims.length, 1);
         assertEq(claims[0].issuer, issuer);
         assertEq(claims[0].holder, alice);
@@ -76,7 +76,7 @@ contract ProCardTest is Test {
         // issuer is submitting but signed with a different key
         address badIssuer = makeAddr("badIssuer");
         vm.prank(badIssuer);
-        vm.expectRevert(ProCard.InvalidSignature.selector);
+        vm.expectRevert(KLIPPProCard.InvalidSignature.selector);
         proCard.addClaim(alice, claimHash, badSig);
     }
 
@@ -88,7 +88,7 @@ contract ProCardTest is Test {
         proCard.addClaim(alice, claimHash, sig);
 
         // Same sig used again (nonce is now 1)
-        vm.expectRevert(ProCard.InvalidSignature.selector);
+        vm.expectRevert(KLIPPProCard.InvalidSignature.selector);
         proCard.addClaim(alice, claimHash, sig);
         vm.stopPrank();
     }
@@ -106,7 +106,7 @@ contract ProCardTest is Test {
         vm.prank(issuer);
         proCard.revokeClaim(alice, 0);
 
-        ProCard.Claim[] memory claims = proCard.getClaims(alice);
+        KLIPPProCard.Claim[] memory claims = proCard.getClaims(alice);
         assertTrue(claims[0].revoked);
     }
 
@@ -118,7 +118,7 @@ contract ProCardTest is Test {
 
         address other = makeAddr("other");
         vm.prank(other);
-        vm.expectRevert(abi.encodeWithSelector(ProCard.NotIssuer.selector, other, issuer));
+        vm.expectRevert(abi.encodeWithSelector(KLIPPProCard.NotIssuer.selector, other, issuer));
         proCard.revokeClaim(alice, 0);
     }
 
@@ -130,14 +130,14 @@ contract ProCardTest is Test {
 
         vm.startPrank(issuer);
         proCard.revokeClaim(alice, 0);
-        vm.expectRevert(abi.encodeWithSelector(ProCard.AlreadyRevoked.selector, 0));
+        vm.expectRevert(abi.encodeWithSelector(KLIPPProCard.AlreadyRevoked.selector, 0));
         proCard.revokeClaim(alice, 0);
         vm.stopPrank();
     }
 
     function test_RevokeOutOfBoundsReverts() public {
         vm.prank(issuer);
-        vm.expectRevert(abi.encodeWithSelector(ProCard.ClaimOutOfBounds.selector, 0, 0));
+        vm.expectRevert(abi.encodeWithSelector(KLIPPProCard.ClaimOutOfBounds.selector, 0, 0));
         proCard.revokeClaim(alice, 0);
     }
 }

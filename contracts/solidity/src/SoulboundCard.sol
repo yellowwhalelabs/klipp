@@ -5,11 +5,11 @@ import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import "@openzeppelin/contracts/token/ERC721/extensions/ERC721URIStorage.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 
-/// @title SoulboundCard
+/// @title KLIPPCard
 /// @notice Layer 1 of KLIPP — a non-transferable ERC-721 digital identity card.
 ///         One card per address. Users mint their own card; transfers are disabled.
 ///         Deployed on Arbitrum Sepolia.
-contract SoulboundCard is ERC721URIStorage, Ownable {
+contract KLIPPCard is ERC721URIStorage, Ownable {
     // ─────────────────────────────────────────────────────────────
     // State
     // ─────────────────────────────────────────────────────────────

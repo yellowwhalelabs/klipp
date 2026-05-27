@@ -44,7 +44,7 @@ export default function OnboardPage() {
 
       // In production: upload metadata to Supabase Storage, get URI, call contract
       // For now: use data URI for demo
-      // TODO: call SoulboundCard.mint(metadataURI) via viem + Privy wallet
+      // TODO: call KLIPPCard.mint(metadataURI) via viem + Privy wallet
       // Upload metadata to Supabase Storage, get URI, then call contract
       const _metadataURI = `data:application/json;base64,${btoa(JSON.stringify(metadata))}`;
       void _metadataURI; // used in real mint call below

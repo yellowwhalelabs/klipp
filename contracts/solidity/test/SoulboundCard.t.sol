@@ -4,13 +4,13 @@ pragma solidity ^0.8.24;
 import "forge-std/Test.sol";
 import "../src/SoulboundCard.sol";
 
-contract SoulboundCardTest is Test {
-    SoulboundCard card;
+contract KLIPPCardTest is Test {
+    KLIPPCard card;
     address alice = makeAddr("alice");
     address bob   = makeAddr("bob");
 
     function setUp() public {
-        card = new SoulboundCard();
+        card = new KLIPPCard();
     }
 
     // ─────────────────────────────────────────────────────────────
@@ -43,7 +43,7 @@ contract SoulboundCardTest is Test {
     function test_DoubleMintReverts() public {
         vm.startPrank(alice);
         card.mint("ipfs://QmAlice");
-        vm.expectRevert(abi.encodeWithSelector(SoulboundCard.AlreadyHasCard.selector, alice));
+        vm.expectRevert(abi.encodeWithSelector(KLIPPCard.AlreadyHasCard.selector, alice));
         card.mint("ipfs://QmAlice2");
         vm.stopPrank();
     }
@@ -57,7 +57,7 @@ contract SoulboundCardTest is Test {
         card.mint("ipfs://QmAlice");
 
         vm.prank(alice);
-        vm.expectRevert(SoulboundCard.TransfersForbidden.selector);
+        vm.expectRevert(KLIPPCard.TransfersForbidden.selector);
         card.transferFrom(alice, bob, 1);
     }
 
@@ -66,7 +66,7 @@ contract SoulboundCardTest is Test {
         card.mint("ipfs://QmAlice");
 
         vm.prank(alice);
-        vm.expectRevert(SoulboundCard.TransfersForbidden.selector);
+        vm.expectRevert(KLIPPCard.TransfersForbidden.selector);
         card.safeTransferFrom(alice, bob, 1);
     }
 
@@ -88,7 +88,7 @@ contract SoulboundCardTest is Test {
         card.mint("ipfs://QmAlice");
 
         vm.prank(bob);
-        vm.expectRevert(abi.encodeWithSelector(SoulboundCard.NotCardOwner.selector, bob, 1));
+        vm.expectRevert(abi.encodeWithSelector(KLIPPCard.NotCardOwner.selector, bob, 1));
         card.updateMetadata(1, "ipfs://QmHacked");
     }
 
@@ -99,7 +99,7 @@ contract SoulboundCardTest is Test {
     function test_MintEmitsEvent() public {
         vm.prank(alice);
         vm.expectEmit(true, true, false, true);
-        emit SoulboundCard.CardMinted(alice, 1, "ipfs://QmAlice");
+        emit KLIPPCard.CardMinted(alice, 1, "ipfs://QmAlice");
         card.mint("ipfs://QmAlice");
     }
 
@@ -109,7 +109,7 @@ contract SoulboundCardTest is Test {
 
         vm.prank(alice);
         vm.expectEmit(true, true, false, true);
-        emit SoulboundCard.CardUpdated(alice, 1, "ipfs://QmV2");
+        emit KLIPPCard.CardUpdated(alice, 1, "ipfs://QmV2");
         card.updateMetadata(1, "ipfs://QmV2");
     }
 }

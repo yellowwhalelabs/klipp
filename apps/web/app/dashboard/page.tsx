@@ -7,7 +7,8 @@ import { motion } from "framer-motion";
 import Link from "next/link";
 import { SignInButton } from "@/components/SignInButton";
 import { CardView } from "@/components/CardView";
-import { Shield, Briefcase, TrendingUp, Plus, ExternalLink, Copy } from "lucide-react";
+import { useKLIPPCard } from "@/hooks/useKLIPPCard";
+import { Shield, Briefcase, TrendingUp, Plus, ExternalLink, Copy, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
 export default function DashboardPage() {
@@ -28,6 +29,14 @@ export default function DashboardPage() {
 
   const walletAddress = user?.wallet?.address ?? "";
   const displayName   = user?.email?.address?.split("@")[0] ?? "KLIPP User";
+
+  // Live on-chain card state — reads KLIPPCard.cardOf() + tokenURI()
+  const {
+    tokenId,
+    hasCard,
+    tokenURI,
+    isLoading: cardLoading,
+  } = useKLIPPCard(walletAddress as `0x${string}` || undefined);
 
   function copyAddress() {
     navigator.clipboard.writeText(walletAddress);
@@ -66,7 +75,7 @@ export default function DashboardPage() {
 
         {/* Card grid */}
         <div className="grid sm:grid-cols-3 gap-6">
-          {/* Layer 1: KLIPP Card */}
+          {/* Layer 1: KLIPP Card — live on-chain read */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -88,18 +97,58 @@ export default function DashboardPage() {
                   <Shield className="w-4 h-4 text-yellow-400" />
                   KLIPP Card
                 </span>
-                <span className="text-xs bg-green-500/10 text-green-400 px-2 py-0.5 rounded-full">
-                  Active
-                </span>
+                {cardLoading ? (
+                  <span className="text-xs text-white/30 flex items-center gap-1">
+                    <Loader2 className="w-3 h-3 animate-spin" />
+                    checking…
+                  </span>
+                ) : hasCard ? (
+                  <span className="text-xs bg-green-500/10 text-green-400 px-2 py-0.5 rounded-full">
+                    Minted #{tokenId.toString()}
+                  </span>
+                ) : (
+                  <span className="text-xs bg-yellow-500/10 text-yellow-400 px-2 py-0.5 rounded-full">
+                    Not minted
+                  </span>
+                )}
               </div>
-              <p className="text-xs text-white/40">Your soulbound identity NFT</p>
-              <a
-                href={`/card/${walletAddress}`}
-                className="flex items-center gap-1 text-xs text-yellow-400/60 hover:text-yellow-400 transition-colors"
-              >
-                <ExternalLink className="w-3 h-3" />
-                View public card
-              </a>
+              <p className="text-xs text-white/40">
+                {hasCard
+                  ? "Soulbound NFT live on Arbitrum Sepolia"
+                  : "Your soulbound identity NFT — not yet minted"}
+              </p>
+              {hasCard && tokenURI && (
+                <a
+                  href={tokenURI.startsWith("ipfs://")
+                    ? `https://ipfs.io/ipfs/${tokenURI.slice(7)}`
+                    : tokenURI}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-1 text-xs text-white/30 hover:text-white/60 transition-colors"
+                >
+                  <ExternalLink className="w-3 h-3" />
+                  Token metadata
+                </a>
+              )}
+              {hasCard ? (
+                <a
+                  href={`https://sepolia.arbiscan.io/token/0xcD238464cFE2901aF24e6d77585a19C2064Ca62A?a=${tokenId.toString()}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-1 text-xs text-yellow-400/60 hover:text-yellow-400 transition-colors"
+                >
+                  <ExternalLink className="w-3 h-3" />
+                  View on Arbiscan
+                </a>
+              ) : (
+                <Link
+                  href="/onboard"
+                  className="flex items-center gap-1 text-xs text-yellow-400/60 hover:text-yellow-400 transition-colors"
+                >
+                  <Plus className="w-3 h-3" />
+                  Mint your card
+                </Link>
+              )}
             </div>
           </motion.div>
 

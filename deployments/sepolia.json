@@ -1,0 +1,22 @@
+{
+  "chainId": 421614,
+  "chainName": "Arbitrum Sepolia",
+  "deployer": "0xE24a4342fE047321Ed8bb1a4571bF87B55646680",
+  "deployedAt": "2026-05-28",
+  "contracts": {
+    "KLIPPCard": {
+      "address": "0xcD238464cFE2901aF24e6d77585a19C2064Ca62A",
+      "txHash": "0x143d45edafb515ccf2a92164376ac4e547c720c951608345f06089b13e139cd0",
+      "blockNumber": 271341720,
+      "tokenName": "KLIPP Card",
+      "tokenSymbol": "KLIPP"
+    },
+    "KLIPPProCard": {
+      "address": "0x1a8F98b493d6c66d255536701c4Eb7E6553e288C",
+      "txHash": "0x17563c9c5222c4e883fb2c50d53689bc92e3c8f64a999db04fa65c597c4b1715",
+      "blockNumber": 271341734,
+      "eip712Domain": "KLIPPProCard"
+    }
+  },
+  "explorer": "https://sepolia.arbiscan.io"
+}

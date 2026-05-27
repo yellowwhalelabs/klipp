@@ -19,7 +19,7 @@ import "../src/CapTable.sol";
 ///     --rpc-url robinhood_testnet --broadcast
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Arbitrum Sepolia — SoulboundCard + ProCard
+// Arbitrum Sepolia — KLIPPCard + KLIPPProCard
 // ─────────────────────────────────────────────────────────────────────────────
 
 contract DeployArbSepolia is Script {
@@ -32,22 +32,18 @@ contract DeployArbSepolia is Script {
 
         vm.startBroadcast(deployerKey);
 
-        SoulboundCard soulboundCard = new SoulboundCard();
-        console.log("SoulboundCard:", address(soulboundCard));
+        KLIPPCard soulboundCard = new KLIPPCard();
+        console.log("KLIPPCard:", address(soulboundCard));
 
-        ProCard proCard = new ProCard();
+        KLIPPProCard proCard = new KLIPPProCard();
         console.log("ProCard:", address(proCard));
 
         vm.stopBroadcast();
 
-        // Write deployment artifacts
-        string memory json = string.concat(
-            '{"chainId":421614,',
-            '"soulboundCard":"', vm.toString(address(soulboundCard)), '",',
-            '"proCard":"',       vm.toString(address(proCard)), '"}'
-        );
-        vm.writeFile("deployments/sepolia.json", json);
-        console.log("Deployment artifacts written to deployments/sepolia.json");
+        // Print addresses — copy to deployments/sepolia.json and .env.local
+        console.log("\n=== Deployment complete! Copy these addresses ===");
+        console.log("NEXT_PUBLIC_SOULBOUND_CARD_ADDRESS=", address(soulboundCard));
+        console.log("NEXT_PUBLIC_PRO_CARD_ADDRESS=", address(proCard));
     }
 }
 

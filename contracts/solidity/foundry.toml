@@ -18,5 +18,10 @@ arbitrum_sepolia = "https://sepolia-rollup.arbitrum.io/rpc"
 robinhood_testnet = "${ROBINHOOD_TESTNET_RPC}"
 
 [etherscan]
-arbitrum_sepolia = { key = "PLACEHOLDER_ARBISCAN_KEY", url = "https://api-sepolia.arbiscan.io/api" }
+# Etherscan V2 unified API — covers all chains including Arbitrum Sepolia (chainId 421614)
+# Get a free key at https://etherscan.io/myapikey, then:
+#   forge verify-contract <addr> src/SoulboundCard.sol:KLIPPCard --chain 421614 \
+#     --verifier-url "https://api.etherscan.io/v2/api?chainid=421614" \
+#     --etherscan-api-key $ETHERSCAN_API_KEY --watch
+arbitrum_sepolia = { key = "${ETHERSCAN_API_KEY}", url = "https://api.etherscan.io/v2/api?chainid=421614" }
 robinhood_testnet = { key = "any", url = "https://explorer.testnet.chain.robinhood.com/api" }

@@ -63,8 +63,8 @@ The vesting math contract (`contracts/stylus/vesting/`) is written in Rust and c
 ### Arbitrum Sepolia
 | Contract | Address |
 |---|---|
-| SoulboundCard | *TBD after deployment* |
-| ProCard | *TBD after deployment* |
+| KLIPPCard | *TBD after deployment* |
+| KLIPPProCard | *TBD after deployment* |
 
 ### Robinhood Chain Testnet (Chain ID: 46630)
 | Contract | Address |
@@ -85,8 +85,8 @@ graph TB
     Frontend --> Supabase[(Supabase: Profiles + Storage)]
     Frontend --> ArbSepolia[Arbitrum Sepolia]
     Frontend --> RobinhoodChain[Robinhood Chain Testnet]
-    ArbSepolia --> SC1[SoulboundCard]
-    ArbSepolia --> SC2[ProCard]
+    ArbSepolia --> SC1[KLIPPCard]
+    ArbSepolia --> SC2[KLIPPProCard]
     RobinhoodChain --> SC3[EquityToken]
     RobinhoodChain --> SC4[CapTable]
     RobinhoodChain --> SC5[Vesting — Stylus/Rust ⭐]
