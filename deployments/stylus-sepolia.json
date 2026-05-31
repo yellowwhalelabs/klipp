@@ -1,0 +1,29 @@
+{
+  "chainId": 421614,
+  "chainName": "Arbitrum Sepolia",
+  "runtime": "Stylus (Rust → WASM)",
+  "deployer": "0xE24a4342fE047321Ed8bb1a4571bF87B55646680",
+  "contracts": {
+    "KLIPPVesting": {
+      "address": "PENDING",
+      "txHash": "PENDING",
+      "verified": false,
+      "rustVersion": "1.96",
+      "stylusSdkVersion": "0.6.1",
+      "wasmTarget": "wasm32-unknown-unknown",
+      "interface": "IVesting",
+      "functions": [
+        "initialize() → ()",
+        "createGrant(uint256,address,uint256,uint64,uint64,uint64) → ()",
+        "vestedAmount(uint256,uint64) → uint256",
+        "unclaimed(uint256,uint64) → uint256",
+        "get_grant(uint256) → (address,uint256,uint256,uint256,uint256,uint256)"
+      ],
+      "unitTests": "17/17 passing",
+      "notes": "Deploy with: docker run --rm klipp-vesting deploy --endpoint https://sepolia-rollup.arbitrum.io/rpc --private-key $DEPLOYER_PRIVATE_KEY"
+    }
+  },
+  "explorer": "https://sepolia.arbiscan.io",
+  "blockscout": "https://arbitrum-sepolia.blockscout.com",
+  "sourceRepo": "contracts/stylus/vesting/"
+}

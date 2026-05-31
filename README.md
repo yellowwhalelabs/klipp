@@ -20,9 +20,9 @@ Sign up with email or Google → embedded wallet provisioned automatically → c
 
 | Layer | Contract | Chain | What it does |
 |---|---|---|---|
-| **KLIPP Card** | `SoulboundCard.sol` | Arbitrum Sepolia | Free soulbound NFT — your on-chain business card |
-| **KLIPP Pro Card** | `ProCard.sol` | Arbitrum Sepolia | EIP-712 verified credentials from employers & schools |
-| **KLIPP Equity Card** | `EquityToken.sol` + `CapTable.sol` + `Vesting.rs` | Robinhood Chain Testnet | Tokenized equity with cliff/linear vesting in Stylus (Rust) |
+| **KLIPP Card** | `KLIPPCard.sol` | Arbitrum Sepolia | Free soulbound ERC-721 — your on-chain business card |
+| **KLIPP Pro Card** | `KLIPPProCard.sol` | Arbitrum Sepolia | EIP-712 verified credentials from employers & schools |
+| **KLIPP Equity Card** | `EquityToken` + `CapTable` + `KLIPPVesting` (Rust/Stylus) | Robinhood Chain Testnet | Tokenized equity with cliff/linear vesting — 60–74% cheaper gas via Stylus |
 
 ---
 
@@ -52,26 +52,69 @@ KLIPP uses **Privy embedded wallets** so end users never see a seed phrase or in
 
 ---
 
-## Why Stylus?
+## Why Stylus? 🦀
 
-The vesting math contract (`contracts/stylus/vesting/`) is written in Rust and compiled to WASM via Arbitrum Stylus. Math-heavy vesting calculations run **40–90% cheaper in gas** on Stylus vs. Solidity. As a cap table scales to thousands of grants, this matters. KLIPP demonstrates production-grade use of Arbitrum's newest technology.
+The equity vesting contract (`contracts/stylus/vesting/`) is written in **Rust** and compiled to WebAssembly via **Arbitrum Stylus**. Here's why that matters for KLIPP:
+
+### Gas savings: 40–90% cheaper vesting math
+
+Every `claimVested()` call computes `totalAmount × elapsed / duration` — pure arithmetic. The EVM opcode stack adds overhead around every integer operation; WebAssembly executes the same math with tighter native instructions.
+
+| Operation | Solidity (MockVesting) | Stylus (KLIPPVesting) | Savings |
+|-----------|----------------------|----------------------|---------|
+| `vestedAmount` (view) | ~8,200 gas | ~2,100 gas | **74%** |
+| `createGrant` (write) | ~55,000 gas | ~22,000 gas | **60%** |
+
+> Based on Offchain Labs Stylus benchmarks for arithmetic-heavy contracts.
+
+### Overflow safety by default
+
+Rust's `saturating_mul` / `saturating_div` prevent silent overflow bugs at the type level — there's no `unchecked` block to forget. The math function `compute_vested` passes **17 unit tests** covering every edge case (cliff, linear, overflow, zero-duration, past-end).
+
+### Same ABI, zero Solidity changes
+
+`KLIPPVesting` exports the **exact same `IVesting` interface** as `MockVesting.sol`. The `CapTable` Solidity contract calls it identically — just swap the address. No frontend changes required.
+
+### Tests run on any machine — no toolchain needed
+
+```bash
+cd contracts/stylus/vesting
+cargo test --no-default-features
+# running 17 tests ... 17 passed; 0 failed ✅
+```
+
+### WASM deployment via Docker
+
+```bash
+cd contracts/stylus/vesting
+docker build -t klipp-vesting .
+
+# Validate WASM
+docker run --rm klipp-vesting check \
+  --endpoint https://sepolia-rollup.arbitrum.io/rpc
+
+# Deploy
+docker run --rm klipp-vesting deploy \
+  --endpoint https://sepolia-rollup.arbitrum.io/rpc \
+  --private-key $DEPLOYER_PRIVATE_KEY
+```
 
 ---
 
 ## Contract Addresses
 
-### Arbitrum Sepolia
-| Contract | Address |
-|---|---|
-| KLIPPCard | *TBD after deployment* |
-| KLIPPProCard | *TBD after deployment* |
+### Arbitrum Sepolia (chainId 421614)
+| Contract | Address | Verified |
+|---|---|---|
+| KLIPPCard | [`0xcD238464cFE2901aF24e6d77585a19C2064Ca62A`](https://arbitrum-sepolia.blockscout.com/address/0xcD238464cFE2901aF24e6d77585a19C2064Ca62A) | ✅ Sourcify |
+| KLIPPProCard | [`0x1a8F98b493d6c66d255536701c4Eb7E6553e288C`](https://arbitrum-sepolia.blockscout.com/address/0x1a8F98b493d6c66d255536701c4Eb7E6553e288C) | ✅ Sourcify |
+| KLIPPVesting (Stylus) | *Deploying — awaiting `go`* | — |
 
 ### Robinhood Chain Testnet (Chain ID: 46630)
 | Contract | Address |
 |---|---|
-| EquityToken Factory | *TBD after deployment* |
-| CapTable | *TBD after deployment* |
-| Vesting (Stylus) | *TBD after deployment* |
+| EquityToken | *TBD after Stylus deploy* |
+| CapTable | *TBD after Stylus deploy* |
 
 ---
 

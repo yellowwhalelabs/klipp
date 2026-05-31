@@ -1,0 +1,29 @@
+[package]
+name    = "klipp-vesting"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "lib"]
+
+# ── Features ──────────────────────────────────────────────────────────────────
+# Default: no features → pure-Rust math only (compiles on any host)
+# "contract" feature pulls in Stylus/alloy for on-chain compilation (wasm32)
+[features]
+default  = []
+contract = ["stylus-sdk", "alloy-primitives", "alloy-sol-types"]
+
+[dependencies]
+stylus-sdk      = { version = "0.6", features = ["export-abi"], optional = true }
+alloy-primitives = { version = "0.7", optional = true }
+alloy-sol-types  = { version = "0.7", optional = true }
+
+[dev-dependencies]
+# no extra deps — tests only exercise compute_vested (pure Rust)
+
+[profile.release]
+codegen-units = 1
+strip         = true
+lto           = true
+panic         = "abort"
+opt-level     = "z"
