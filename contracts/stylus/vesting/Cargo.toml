@@ -7,19 +7,25 @@ edition = "2021"
 crate-type = ["cdylib", "lib"]
 
 # ── Features ──────────────────────────────────────────────────────────────────
-# Default: no features → pure-Rust math only (compiles on any host)
-# "contract" feature pulls in Stylus/alloy for on-chain compilation (wasm32)
+# Default: no features → pure-Rust math only (compiles on any host incl. Windows)
+# "contract" feature: pulls in Stylus SDK for wasm32-unknown-unknown compilation
+#   Build with: cargo build --features contract --target wasm32-unknown-unknown
+#   Or use the GitHub Actions workflow (.github/workflows/deploy-stylus.yml)
+#   which runs on Ubuntu where native keccak assembly is available.
 [features]
-default  = []
-contract = ["stylus-sdk", "alloy-primitives", "alloy-sol-types"]
+default    = []
+export-abi = ["dep:stylus-sdk"]
+contract   = ["dep:stylus-sdk", "dep:alloy-primitives", "dep:alloy-sol-types"]
 
 [dependencies]
-stylus-sdk      = { version = "0.6", features = ["export-abi"], optional = true }
-alloy-primitives = { version = "0.7", optional = true }
-alloy-sol-types  = { version = "0.7", optional = true }
+# stylus-sdk 0.8: requires Linux/macOS for wasm32 build (keccak-asm uses x86_64 assembly)
+# Unit tests (cargo test --no-default-features) work on any host — no Stylus deps needed.
+stylus-sdk       = { version = "0.8", features = ["export-abi"], optional = true }
+alloy-primitives = { version = "0.8", optional = true }
+alloy-sol-types  = { version = "0.8", optional = true }
 
 [dev-dependencies]
-# no extra deps — tests only exercise compute_vested (pure Rust)
+# No extra deps — tests only exercise compute_vested (pure Rust math)
 
 [profile.release]
 codegen-units = 1

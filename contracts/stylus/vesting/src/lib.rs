@@ -11,10 +11,13 @@
 //! Build modes
 //! -----------
 //! • `cargo test --no-default-features` — pure-Rust math tests, runs on any host (incl. Windows)
-//! • `cargo build --features contract --target wasm32-unknown-unknown` — full Stylus contract
-//! • `cargo stylus check` — WASM compile + size check (uses wasm32-unknown-unknown implicitly)
+//! • `cargo stylus check --features contract` — WASM compile + ABI validation
+//! • `cargo stylus deploy --features contract --endpoint $RPC --private-key $KEY` — deploy
+//!
+//! cargo-stylus 0.10.x + stylus-sdk 0.8.x + Rust 1.96 in Docker (see Dockerfile)
 
-#![cfg_attr(all(not(test), feature = "contract"), no_main)]
+// stylus-sdk 0.8 uses `export-abi` feature for ABI export; no_main for on-chain binary
+#![cfg_attr(not(any(test, feature = "export-abi")), no_main)]
 extern crate alloc;
 
 // ---------------------------------------------------------------------------
