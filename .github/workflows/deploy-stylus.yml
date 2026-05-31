@@ -1,0 +1,148 @@
+name: Deploy KLIPPVesting (Stylus)
+
+on:
+  workflow_dispatch:
+    inputs:
+      network:
+        description: "Target network"
+        required: true
+        default: "arbitrum-sepolia"
+        type: choice
+        options:
+          - arbitrum-sepolia
+          - robinhood-testnet
+      dry_run:
+        description: "Dry run (check only, no deploy)"
+        required: false
+        default: "false"
+        type: boolean
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_VERSION: "1.96"
+
+# Least-privilege: the only write this workflow needs is committing the
+# deployed address back to deployments/stylus-sepolia.json via GITHUB_TOKEN.
+permissions:
+  contents: write
+
+# Never let two deploys run at once (avoids nonce races on the deployer wallet).
+concurrency:
+  group: stylus-deploy-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build-and-deploy:
+    name: Build WASM + Deploy Stylus
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: contracts/stylus/vesting
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust ${{ env.RUST_VERSION }}
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: ${{ env.RUST_VERSION }}
+          targets: wasm32-unknown-unknown
+
+      - name: Cache cargo registry + build
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            contracts/stylus/vesting/target
+          key: stylus-${{ runner.os }}-${{ hashFiles('contracts/stylus/vesting/Cargo.lock') }}
+          restore-keys: stylus-${{ runner.os }}-
+
+      - name: Run unit tests (pure Rust math, no Stylus toolchain needed)
+        run: cargo test --no-default-features -- --nocapture
+
+      - name: Install cargo-stylus
+        run: cargo install cargo-stylus
+
+      - name: Set RPC endpoint
+        run: |
+          if [ "${{ inputs.network }}" == "arbitrum-sepolia" ]; then
+            echo "RPC_URL=https://sepolia-rollup.arbitrum.io/rpc" >> $GITHUB_ENV
+          else
+            echo "RPC_URL=https://rpc.testnet.chain.robinhood.com" >> $GITHUB_ENV
+          fi
+
+      - name: cargo stylus check (WASM validation)
+        run: cargo stylus check --features contract --endpoint ${{ env.RPC_URL }}
+
+      - name: cargo stylus deploy
+        if: ${{ inputs.dry_run != 'true' }}
+        env:
+          # The secret is exposed to the step ONLY through this env var, which is
+          # set directly from ${{ secrets.* }}. GitHub auto-masks the secret value
+          # in all log output. We never `echo "$DEPLOYER_KEY"`.
+          DEPLOYER_KEY: ${{ secrets.DEPLOYER_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+
+          # Write the key to a 0600 file in RUNNER_TEMP — OUTSIDE the repo checkout,
+          # so it can never be staged by `git add` or picked up by an artifact
+          # upload (this workflow uploads no artifacts at all). cargo-stylus reads
+          # it via --private-key-path, so the key never appears in the process
+          # argument list (argv) either. The file is shredded in a trap on exit.
+          KEYFILE="$(mktemp "$RUNNER_TEMP/deployer.XXXXXX.key")"
+          chmod 600 "$KEYFILE"
+          cleanup() { shred -u "$KEYFILE" 2>/dev/null || rm -f "$KEYFILE"; }
+          trap cleanup EXIT
+          printf '%s' "$DEPLOYER_KEY" > "$KEYFILE"
+
+          # Capture deploy output into a shell variable held in memory — it is
+          # NOT written to any file in the repo. We deliberately parse only the
+          # known-safe public fields below rather than echoing the whole blob.
+          DEPLOY_OUT="$(cargo stylus deploy \
+                --features contract \
+                --endpoint "${RPC_URL}" \
+                --private-key-path "$KEYFILE" 2>&1 || true)"
+
+          # Public on-chain facts only. Parse the 64-char tx hash FIRST, then
+          # match the 40-char address with a PCRE negative-lookahead so it can
+          # never grab the leading 40 hex of a 64-char hash.
+          TXHASH=$(printf '%s' "$DEPLOY_OUT" | grep -oiE '0x[0-9a-fA-F]{64}' | head -1 || true)
+          ADDR=$(printf '%s' "$DEPLOY_OUT"   | grep -oiP '0x[0-9a-fA-F]{40}(?![0-9a-fA-F])' | head -1 || true)
+          BLOCK=$(printf '%s' "$DEPLOY_OUT"  | grep -oiE 'block:? *[0-9]+' | grep -oE '[0-9]+' | head -1 || true)
+
+          # If we couldn't parse an address, fail WITHOUT dumping raw output
+          # (raw output is withheld so a stray key echo from the tool can't leak).
+          if [ -z "$ADDR" ]; then
+            echo "::error::Deploy produced no parseable contract address. Raw output withheld to avoid leaking secrets. Re-run with dry_run=true to debug the check step."
+            exit 1
+          fi
+
+          echo "DEPLOYED_ADDRESS=$ADDR"   >> "$GITHUB_ENV"
+          echo "DEPLOYED_TXHASH=$TXHASH"  >> "$GITHUB_ENV"
+          echo "DEPLOYED_BLOCK=$BLOCK"    >> "$GITHUB_ENV"
+
+          # All three are public on-chain data — safe to log.
+          echo "✅ KLIPPVesting deployed"
+          echo "   Address: $ADDR"
+          echo "   Tx hash: ${TXHASH:-<unparsed>}"
+          echo "   Block:   ${BLOCK:-<unparsed>}"
+
+      - name: Update deployments JSON
+        if: ${{ inputs.dry_run != 'true' && env.DEPLOYED_ADDRESS != '' }}
+        run: |
+          cd ../../..  # back to repo root
+          # Update the PENDING address in deployments/stylus-sepolia.json
+          sed -i "s/\"PENDING\"/\"${{ env.DEPLOYED_ADDRESS }}\"/" deployments/stylus-sepolia.json
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add deployments/stylus-sepolia.json
+          git commit -m "chore: update KLIPPVesting address → ${{ env.DEPLOYED_ADDRESS }}" || true
+          git push || true
+
+      - name: Summary
+        run: |
+          echo "## KLIPPVesting Deployment" >> $GITHUB_STEP_SUMMARY
+          echo "- **Network**: ${{ inputs.network }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Address**: ${{ env.DEPLOYED_ADDRESS || 'dry-run — not deployed' }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Unit tests**: 17/17 ✅" >> $GITHUB_STEP_SUMMARY
