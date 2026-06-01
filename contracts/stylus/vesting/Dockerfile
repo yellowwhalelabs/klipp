@@ -6,7 +6,6 @@
 #            --endpoint https://sepolia-rollup.arbitrum.io/rpc \
 #            --private-key $DEPLOYER_PRIVATE_KEY
 
-# cargo-stylus 0.10.x requires rustc >= 1.91
 FROM rust:1.96-bookworm AS builder
 
 # System deps
@@ -20,11 +19,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # WASM target
 RUN rustup target add wasm32-unknown-unknown
 
-# cargo-stylus 0.5.x: no Stylus.toml required, simpler check/deploy
-RUN cargo install cargo-stylus --version "^0.5"
+# Pin cargo-stylus to v0.6.3 — last release of the archived OffchainLabs/cargo-stylus
+# repo. Does NOT require a Stylus.toml (the 0.10.x crate does). Matches CI.
+RUN cargo install cargo-stylus --version 0.6.3
 
 WORKDIR /app
-COPY Cargo.toml Stylus.toml ./
+# Linux build: keccak-asm's x86_64 assembly is available natively, so no
+# keccak stub / [patch.crates-io] is needed (that was a Windows-only workaround).
+COPY Cargo.toml ./
 COPY src/ ./src/
 
 # cargo stylus check compiles to wasm32-unknown-unknown internally

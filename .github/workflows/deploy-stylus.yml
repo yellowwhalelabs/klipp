@@ -40,7 +40,7 @@ jobs:
         working-directory: contracts/stylus/vesting
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Install Rust ${{ env.RUST_VERSION }}
         uses: dtolnay/rust-toolchain@stable
@@ -49,7 +49,7 @@ jobs:
           targets: wasm32-unknown-unknown
 
       - name: Cache cargo registry + build
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             ~/.cargo/registry
@@ -62,7 +62,12 @@ jobs:
         run: cargo test --no-default-features -- --nocapture
 
       - name: Install cargo-stylus
-        run: cargo install cargo-stylus
+        # Pin to v0.6.3 — the last release of the now-archived OffchainLabs/cargo-stylus
+        # repo (archived 2025-10-16). v0.6.3 does NOT require a Stylus.toml and supports
+        # the --features / --endpoint / --private-key-path flags this workflow uses.
+        # The newer 0.10.x crate on crates.io demands an undocumented Stylus.toml schema
+        # (workspace/networks fields) — deliberately avoided here.
+        run: cargo install cargo-stylus --version 0.6.3
 
       - name: Set RPC endpoint
         run: |
