@@ -16,7 +16,11 @@
 //!
 //! cargo-stylus 0.10.x + stylus-sdk 0.8.x + Rust 1.96 in Docker (see Dockerfile)
 
-// stylus-sdk 0.8 uses `export-abi` feature for ABI export; no_main for on-chain binary
+// On-chain WASM builds must be no_std + no_main (no OS, custom entrypoint).
+// Tests (`cargo test --no-default-features`) and `export-abi` builds keep std +
+// the normal main, so both attributes are gated off in those two cases.
+// Mirrors OffchainLabs/stylus-hello-world.
+#![cfg_attr(not(any(test, feature = "export-abi")), no_std)]
 #![cfg_attr(not(any(test, feature = "export-abi")), no_main)]
 extern crate alloc;
 

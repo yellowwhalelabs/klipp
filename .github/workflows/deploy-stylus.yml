@@ -19,7 +19,9 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
-  RUST_VERSION: "1.96"
+  # Must match contracts/stylus/vesting/rust-toolchain.toml (1.87.0) so the
+  # dtolnay action and rustup's toolchain-file selection don't disagree.
+  RUST_VERSION: "1.87.0"
 
 # Least-privilege: the only write this workflow needs is committing the
 # deployed address back to deployments/stylus-sepolia.json via GITHUB_TOKEN.
