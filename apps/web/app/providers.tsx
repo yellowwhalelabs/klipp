@@ -62,7 +62,10 @@ export function Providers({ children }: { children: React.ReactNode }) {
     <PrivyProvider
       appId={privyAppId}
       config={{
-        loginMethods: ["email", "google", "apple", "passkey"],
+        // Email + passkey require no external OAuth app setup, so they work
+        // immediately. Google/Apple/Discord each need their own OAuth app
+        // configured in the Privy dashboard — re-add them once that's done.
+        loginMethods: ["email", "passkey"],
         embeddedWallets: {
           ethereum: {
             createOnLogin: "users-without-wallets",
