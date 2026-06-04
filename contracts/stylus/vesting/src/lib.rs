@@ -16,13 +16,18 @@
 //!
 //! cargo-stylus 0.10.x + stylus-sdk 0.8.x + Rust 1.96 in Docker (see Dockerfile)
 
-// On-chain WASM builds use a custom entrypoint, so the normal `main` is disabled
-// (no_main). They are deliberately NOT no_std: stylus-sdk 0.8.4 and the
-// wasm32-unknown-unknown target rely on `std` being present — its #[public] and
-// storage macros expand to `std::`/`vec!` paths that don't resolve under no_std
-// (E0433 "unresolved crate std" / "cannot find macro vec"). Tests and export-abi
-// builds keep the normal main. Mirrors OffchainLabs/stylus-hello-world (no_main).
-#![cfg_attr(not(any(test, feature = "export-abi")), no_main)]
+// On-chain WASM builds must be no_std + no_main: stylus-sdk supplies the wasm
+// global allocator and panic handler (gated on no_std + target_arch=wasm32), and
+// a custom entrypoint replaces `main`. Without no_std the produced wasm is not a
+// valid Stylus program (activation fails: "missing entrypoint").
+//
+// The `target_arch = "wasm32"` guard is essential: this crate is
+// crate-type = ["cdylib", "lib"], and `cargo test` compiles the cdylib WITHOUT
+// the test cfg — without the arch guard that host build would become no_std and
+// fail (no allocator / no #[panic_handler]). So no_std/no_main apply ONLY to the
+// real on-chain wasm. Tests and export-abi builds keep std + the normal main.
+#![cfg_attr(all(not(any(test, feature = "export-abi")), target_arch = "wasm32"), no_std)]
+#![cfg_attr(all(not(any(test, feature = "export-abi")), target_arch = "wasm32"), no_main)]
 extern crate alloc;
 
 // ---------------------------------------------------------------------------
@@ -76,6 +81,10 @@ pub fn compute_vested(
 mod contract {
     use super::compute_vested;
     use alloc::vec::Vec;
+    // The `vec!` macro (used by stylus-sdk's sol_storage!/#[public] expansions)
+    // is NOT in scope under no_std just from importing the Vec type — bring in
+    // the alloc::vec module so the macro resolves.
+    use alloc::vec;
     use stylus_sdk::{
         alloy_primitives::{Address, U256},
         msg,
