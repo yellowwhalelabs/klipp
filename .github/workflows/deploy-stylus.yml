@@ -69,7 +69,13 @@ jobs:
         # the --features / --endpoint / --private-key-path flags this workflow uses.
         # The newer 0.10.x crate on crates.io demands an undocumented Stylus.toml schema
         # (workspace/networks fields) — deliberately avoided here.
-        run: cargo install cargo-stylus --version 0.6.3
+        #
+        # --locked is REQUIRED: without it, cargo resolves cargo-stylus's transitive
+        # deps to their latest semver-compatible versions, and newer alloy releases
+        # have bumped their MSRV to rustc 1.91 — which fails against our pinned 1.87.0
+        # toolchain. --locked installs using the Cargo.lock shipped with 0.6.3, pinning
+        # every transitive dep to the version that built cleanly on 1.87 at release time.
+        run: cargo install cargo-stylus --version 0.6.3 --locked
 
       - name: Set RPC endpoint
         run: |
