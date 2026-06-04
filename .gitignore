@@ -23,7 +23,11 @@ contracts/solidity/lib
 
 # Rust / Stylus
 contracts/stylus/target
-contracts/stylus/**/*.lock
+# NOTE: Cargo.lock is intentionally NOT ignored. This is a deployable contract
+# crate, so the lockfile must be committed for reproducible, MSRV-pinned builds
+# (see contracts/stylus/vesting/Cargo.toml rust-version). Ignoring it caused CI
+# to resolve transitive deps to latest on every run, drifting past the pinned
+# 1.87 toolchain.
 
 # Vercel
 .vercel
