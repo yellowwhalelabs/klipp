@@ -100,7 +100,12 @@ mod contract {
             mapping(uint256 => uint256)  cliff_seconds;
             mapping(uint256 => uint256)  duration_seconds;
             mapping(uint256 => uint256)  claimed;
-            mapping(uint256 => bool)     exists;
+            // NOTE: stored as uint256 (0 = absent, 1 = present) rather than bool.
+            // stylus-sdk 0.8.4's StorageBool triggers a broken const-eval in
+            // alloy-primitives/ruint (Uint<8,1>::to_be_bytes::<32> — "BYTES must
+            // be equal to Self::BYTES", storage/traits.rs:305). uint256 avoids the
+            // 8-bit storage path entirely with identical semantics.
+            mapping(uint256 => uint256)  exists;
         }
     }
 
@@ -128,7 +133,7 @@ mod contract {
                 return Err(b"KLIPPVesting: not owner".to_vec());
             }
             // No duplicate grants
-            if self.exists.get(grant_id) {
+            if self.exists.get(grant_id) != U256::ZERO {
                 return Err(b"KLIPPVesting: grant exists".to_vec());
             }
             // Sanity: duration must be non-zero
@@ -146,7 +151,7 @@ mod contract {
                 .setter(grant_id)
                 .set(U256::from(duration_seconds));
             self.claimed.setter(grant_id).set(U256::ZERO);
-            self.exists.setter(grant_id).set(true);
+            self.exists.setter(grant_id).set(U256::from(1));
 
             Ok(())
         }
@@ -158,7 +163,7 @@ mod contract {
             grant_id: U256,
             current_time: u64,
         ) -> Result<U256, Vec<u8>> {
-            if !self.exists.get(grant_id) {
+            if self.exists.get(grant_id) == U256::ZERO {
                 return Err(b"KLIPPVesting: unknown grant".to_vec());
             }
             let total = self.total_amount.get(grant_id);
@@ -189,7 +194,7 @@ mod contract {
             &self,
             grant_id: U256,
         ) -> Result<(Address, U256, U256, U256, U256, U256), Vec<u8>> {
-            if !self.exists.get(grant_id) {
+            if self.exists.get(grant_id) == U256::ZERO {
                 return Err(b"KLIPPVesting: unknown grant".to_vec());
             }
             Ok((
