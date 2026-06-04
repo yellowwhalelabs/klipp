@@ -92,7 +92,10 @@ jobs:
         run: cargo stylus check --features contract --endpoint ${{ env.RPC_URL }}
 
       - name: cargo stylus deploy
-        if: ${{ inputs.dry_run != 'true' }}
+        # dry_run is a boolean input; when dispatched it arrives as boolean `true`,
+        # so comparing only against the string 'true' (`!= 'true'`) wrongly let this
+        # step run on dry runs. Guard against BOTH the boolean and string forms.
+        if: ${{ inputs.dry_run != true && inputs.dry_run != 'true' }}
         env:
           # The secret is exposed to the step ONLY through this env var, which is
           # set directly from ${{ secrets.* }}. GitHub auto-masks the secret value
@@ -145,7 +148,7 @@ jobs:
           echo "   Block:   ${BLOCK:-<unparsed>}"
 
       - name: Update deployments JSON
-        if: ${{ inputs.dry_run != 'true' && env.DEPLOYED_ADDRESS != '' }}
+        if: ${{ inputs.dry_run != true && inputs.dry_run != 'true' && env.DEPLOYED_ADDRESS != '' }}
         run: |
           cd ../../..  # back to repo root
           # Update the PENDING address in deployments/stylus-sepolia.json
