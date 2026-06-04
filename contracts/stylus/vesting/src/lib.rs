@@ -100,11 +100,7 @@ mod contract {
             mapping(uint256 => uint256)  cliff_seconds;
             mapping(uint256 => uint256)  duration_seconds;
             mapping(uint256 => uint256)  claimed;
-            // NOTE: stored as uint256 (0 = absent, 1 = present) rather than bool.
-            // stylus-sdk 0.8.4's StorageBool triggers a broken const-eval in
-            // alloy-primitives/ruint (Uint<8,1>::to_be_bytes::<32> — "BYTES must
-            // be equal to Self::BYTES", storage/traits.rs:305). uint256 avoids the
-            // 8-bit storage path entirely with identical semantics.
+            // Existence flag stored as uint256 (0 = absent, 1 = present).
             mapping(uint256 => uint256)  exists;
         }
     }
