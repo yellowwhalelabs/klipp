@@ -1,10 +1,11 @@
 # Pinned Rust toolchain for the Stylus build.
 # cargo-stylus requires a SPECIFIC version (not "stable") so the WASM output is
-# reproducible. 1.87.0 matches the OffchainLabs/stylus-hello-world template that
-# targets cargo-stylus 0.6.x + stylus-sdk 0.8/0.9.
+# reproducible. 1.90.0 is the floor required by stylus-sdk 0.8.4: its code path
+# through alloy-primitives needs ruint 1.18.0, whose MSRV is 1.90. (1.87 cannot
+# compile stylus-sdk 0.8.4 — ruint 1.17.x rejects its to_le_bytes::<32> call.)
 #
 # The wasm32 target is listed here so `rustup` auto-installs it whenever cargo
 # runs in this directory (CI and local alike).
 [toolchain]
-channel = "1.87.0"
+channel = "1.90.0"
 targets = ["wasm32-unknown-unknown"]

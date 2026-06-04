@@ -19,9 +19,10 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
-  # Must match contracts/stylus/vesting/rust-toolchain.toml (1.87.0) so the
+  # Must match contracts/stylus/vesting/rust-toolchain.toml (1.90.0) so the
   # dtolnay action and rustup's toolchain-file selection don't disagree.
-  RUST_VERSION: "1.87.0"
+  # 1.90 is the floor for stylus-sdk 0.8.4 (needs ruint 1.18, MSRV 1.90).
+  RUST_VERSION: "1.90.0"
 
 # Least-privilege: the only write this workflow needs is committing the
 # deployed address back to deployments/stylus-sepolia.json via GITHUB_TOKEN.

@@ -2,12 +2,12 @@
 name    = "klipp-vesting"
 version = "0.1.0"
 edition = "2021"
-# Pinned MSRV — must match rust-toolchain.toml and the CI RUST_VERSION (1.87.0).
-# Combined with the resolver = "3" below, this enables Cargo's MSRV-aware
-# dependency resolver, so `cargo generate-lockfile` selects transitive-dep
-# versions compatible with 1.87 (e.g. ruint 1.17.x, MSRV 1.85) instead of
-# drifting to the latest (ruint 1.18 / alloy 1.8.x) which require rustc 1.90+.
-rust-version = "1.87"
+# Pinned MSRV — must match rust-toolchain.toml and the CI RUST_VERSION (1.90.0).
+# 1.90 is the floor required by stylus-sdk 0.8.4 (it needs ruint 1.18.0, MSRV
+# 1.90). Combined with resolver = "3" below, the MSRV-aware resolver keeps the
+# committed Cargo.lock at the SDK's tested combo (ruint 1.18.0, alloy-primitives
+# 0.8.26) and prevents future drift past this floor.
+rust-version = "1.90"
 
 # Standalone workspace root so we can opt into resolver v3 (MSRV-aware) on an
 # edition-2021 crate. There is no parent Cargo workspace (this lives inside a
