@@ -18,10 +18,14 @@
 
 // On-chain WASM builds must be no_std + no_main (no OS, custom entrypoint).
 // Tests (`cargo test --no-default-features`) and `export-abi` builds keep std +
-// the normal main, so both attributes are gated off in those two cases.
+// the normal main. The `target_arch = "wasm32"` guard is essential: this crate
+// is `crate-type = ["cdylib", "lib"]`, and `cargo test` compiles the cdylib
+// artifact WITHOUT the `test` cfg. Without the arch guard that host cdylib build
+// would become no_std and fail (no global allocator / no #[panic_handler]). By
+// requiring wasm32, no_std applies ONLY to actual on-chain builds.
 // Mirrors OffchainLabs/stylus-hello-world.
-#![cfg_attr(not(any(test, feature = "export-abi")), no_std)]
-#![cfg_attr(not(any(test, feature = "export-abi")), no_main)]
+#![cfg_attr(all(not(any(test, feature = "export-abi")), target_arch = "wasm32"), no_std)]
+#![cfg_attr(all(not(any(test, feature = "export-abi")), target_arch = "wasm32"), no_main)]
 extern crate alloc;
 
 // ---------------------------------------------------------------------------
