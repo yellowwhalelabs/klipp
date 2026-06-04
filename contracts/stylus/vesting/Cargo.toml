@@ -26,13 +26,21 @@ crate-type = ["cdylib", "lib"]
 #   which runs on Ubuntu where native keccak assembly is available.
 [features]
 default    = []
-export-abi = ["dep:stylus-sdk"]
+# export-abi: host-only ABI export build. ONLY this feature may turn on
+# stylus-sdk/export-abi — that pulls in std-based ABI generation AND makes
+# #[entrypoint] emit a `main()` that prints the ABI instead of the on-chain
+# `user_entrypoint`. Enabling it for the wasm `contract` build (as the dependency
+# previously did unconditionally) is what caused "missing entrypoint" and the
+# no_std "unresolved crate std" errors.
+export-abi = ["dep:stylus-sdk", "stylus-sdk/export-abi"]
 contract   = ["dep:stylus-sdk", "dep:alloy-primitives", "dep:alloy-sol-types"]
 
 [dependencies]
 # stylus-sdk 0.8: requires Linux/macOS for wasm32 build (keccak-asm uses x86_64 assembly)
 # Unit tests (cargo test --no-default-features) work on any host — no Stylus deps needed.
-stylus-sdk       = { version = "0.8", features = ["export-abi"], optional = true }
+# NOTE: do NOT enable export-abi here — it must stay gated behind the crate's own
+# export-abi feature (see [features] above), or the wasm contract build breaks.
+stylus-sdk       = { version = "0.8", optional = true }
 alloy-primitives = { version = "0.8", optional = true }
 alloy-sol-types  = { version = "0.8", optional = true }
 
