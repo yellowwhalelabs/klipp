@@ -61,7 +61,9 @@ jobs:
           restore-keys: stylus-${{ runner.os }}-
 
       - name: Run unit tests (pure Rust math, no Stylus toolchain needed)
-        run: cargo test --no-default-features -- --nocapture
+        # --locked: fail if Cargo.lock would need changes, guaranteeing CI builds
+        # the exact 1.87-compatible dependency set we committed (no silent drift).
+        run: cargo test --no-default-features --locked -- --nocapture
 
       - name: Install cargo-stylus
         # Pin to v0.6.3 — the last release of the now-archived OffchainLabs/cargo-stylus
