@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase";
 
 export const runtime = "nodejs";
+// Uses the Supabase service-role client at request time; never pre-render or
+// statically collect this route during build.
+export const dynamic = "force-dynamic";
 
 interface UpsertBody {
   walletAddress: string;

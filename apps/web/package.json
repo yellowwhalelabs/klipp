@@ -9,6 +9,7 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@hookform/resolvers": "^5.4.0",
     "@privy-io/react-auth": "^3.27.1",
     "@privy-io/server-auth": "^1.32.5",
     "@privy-io/wagmi": "^4.0.8",
