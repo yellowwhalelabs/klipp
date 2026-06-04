@@ -16,16 +16,13 @@
 //!
 //! cargo-stylus 0.10.x + stylus-sdk 0.8.x + Rust 1.96 in Docker (see Dockerfile)
 
-// On-chain WASM builds must be no_std + no_main (no OS, custom entrypoint).
-// Tests (`cargo test --no-default-features`) and `export-abi` builds keep std +
-// the normal main. The `target_arch = "wasm32"` guard is essential: this crate
-// is `crate-type = ["cdylib", "lib"]`, and `cargo test` compiles the cdylib
-// artifact WITHOUT the `test` cfg. Without the arch guard that host cdylib build
-// would become no_std and fail (no global allocator / no #[panic_handler]). By
-// requiring wasm32, no_std applies ONLY to actual on-chain builds.
-// Mirrors OffchainLabs/stylus-hello-world.
-#![cfg_attr(all(not(any(test, feature = "export-abi")), target_arch = "wasm32"), no_std)]
-#![cfg_attr(all(not(any(test, feature = "export-abi")), target_arch = "wasm32"), no_main)]
+// On-chain WASM builds use a custom entrypoint, so the normal `main` is disabled
+// (no_main). They are deliberately NOT no_std: stylus-sdk 0.8.4 and the
+// wasm32-unknown-unknown target rely on `std` being present — its #[public] and
+// storage macros expand to `std::`/`vec!` paths that don't resolve under no_std
+// (E0433 "unresolved crate std" / "cannot find macro vec"). Tests and export-abi
+// builds keep the normal main. Mirrors OffchainLabs/stylus-hello-world (no_main).
+#![cfg_attr(not(any(test, feature = "export-abi")), no_main)]
 extern crate alloc;
 
 // ---------------------------------------------------------------------------
