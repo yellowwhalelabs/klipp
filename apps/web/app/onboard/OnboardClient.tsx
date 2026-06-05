@@ -1,21 +1,17 @@
 "use client";
 
 import { usePrivy } from "@privy-io/react-auth";
+import { useSmartWallets } from "@privy-io/react-auth/smart-wallets";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
+import { encodeFunctionData } from "viem";
 import { arbitrumSepolia } from "viem/chains";
-import {
-  useBalance,
-  usePublicClient,
-  useSwitchChain,
-  useWriteContract,
-} from "wagmi";
+import { usePublicClient } from "wagmi";
 import {
   CheckCircle2,
   ExternalLink,
-  Fuel,
   ImageIcon,
   Loader2,
   User,
@@ -29,17 +25,15 @@ type Step = "sign-in" | "profile" | "minting" | "done";
 
 type MintStage =
   | "uploading"
-  | "switching-chain"
-  | "waiting-wallet"
+  | "submitting"
   | "confirming"
   | "saving";
 
 const STAGE_TEXT: Record<MintStage, string> = {
-  uploading:         "Uploading your avatar…",
-  "switching-chain": "Switching to Arbitrum Sepolia…",
-  "waiting-wallet":  "Approve in your wallet…",
-  confirming:        "Confirming on-chain (~5–10 s)…",
-  saving:            "Saving your profile…",
+  uploading:  "Uploading your avatar…",
+  submitting: "Minting your card (gas sponsored)…",
+  confirming: "Confirming on-chain (~5–10 s)…",
+  saving:     "Saving your profile…",
 };
 
 // ─── Storage helpers ─────────────────────────────────────────────────────────
@@ -101,20 +95,17 @@ export default function OnboardPage() {
   const [txHash, setTxHash]           = useState<`0x${string}` | null>(null);
   const fileInputRef                  = useRef<HTMLInputElement>(null);
 
-  const walletAddress = (user?.wallet?.address ?? "") as `0x${string}`;
+  // Smart-account (ERC-4337) client — mints are sent as sponsored
+  // UserOperations through the Alchemy Gas Manager paymaster, so the user
+  // never needs ETH. The card is owned by the smart-account address (the
+  // UserOp's msg.sender), so we key the profile/storage on it.
+  const { client: smartWalletClient } = useSmartWallets();
+  const walletAddress = (smartWalletClient?.account?.address ??
+    user?.smartWallet?.address ??
+    user?.wallet?.address ??
+    "") as `0x${string}`;
 
-  // ── Wagmi hooks ────────────────────────────────────────────────────────────
-  const { data: balance }    = useBalance({
-    address: walletAddress || undefined,
-    chainId: arbitrumSepolia.id,
-    query:   { enabled: !!walletAddress, refetchInterval: 10_000 },
-  });
-
-  const { writeContractAsync } = useWriteContract();
-  const { switchChainAsync }   = useSwitchChain();
-  const publicClient           = usePublicClient({ chainId: arbitrumSepolia.id });
-
-  const hasBalance = (balance?.value ?? 0n) > 0n;
+  const publicClient = usePublicClient({ chainId: arbitrumSepolia.id });
 
   // ── Auth gate ──────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -137,12 +128,8 @@ export default function OnboardPage() {
       toast.error("Please enter a display name");
       return;
     }
-    if (!walletAddress) {
-      toast.error("No wallet found — please sign in again");
-      return;
-    }
-    if (!hasBalance) {
-      toast.error("You need Arbitrum Sepolia ETH to mint. Use the faucet below.");
+    if (!smartWalletClient || !walletAddress) {
+      toast.error("Your wallet is still setting up — give it a second and try again.");
       return;
     }
 
@@ -171,22 +158,19 @@ export default function OnboardPage() {
       };
       const metadataUri = await uploadMetadata(metadata, walletAddress);
 
-      // ── 3. Switch to Arbitrum Sepolia ────────────────────────────────────
-      setMintStage("switching-chain");
-      try {
-        await switchChainAsync({ chainId: arbitrumSepolia.id });
-      } catch {
-        // Already on the right chain — safe to ignore
-      }
-
-      // ── 4. Call KLIPPCard.mint(metadataUri) ──────────────────────────────
-      setMintStage("waiting-wallet");
-      const hash = await writeContractAsync({
-        address:      CONTRACTS.SOULBOUND_CARD,
-        abi:          SOULBOUND_CARD_ABI,
-        functionName: "mint",
-        args:         [metadataUri],
-        chainId:      arbitrumSepolia.id,
+      // ── 3. Mint KLIPPCard.mint(metadataUri) as a sponsored UserOperation ──
+      // The smart-account client signs invisibly with the embedded wallet and
+      // the Alchemy Gas Manager pays the gas — no wallet popup, no ETH, no chain
+      // switch (the client targets Arbitrum Sepolia directly).
+      setMintStage("submitting");
+      const hash = await smartWalletClient.sendTransaction({
+        chain: arbitrumSepolia,
+        to:    CONTRACTS.SOULBOUND_CARD,
+        data:  encodeFunctionData({
+          abi:          SOULBOUND_CARD_ABI,
+          functionName: "mint",
+          args:         [metadataUri],
+        }),
       });
 
       setTxHash(hash);
@@ -372,45 +356,24 @@ export default function OnboardPage() {
                 </div>
               </div>
 
-              {/* Gas check banner */}
-              {walletAddress && !hasBalance && (
-                <div className="flex items-start gap-3 p-3 rounded-xl bg-amber-500/10 border border-amber-500/20">
-                  <Fuel className="w-4 h-4 text-amber-400 mt-0.5 shrink-0" />
-                  <div className="space-y-1 flex-1 min-w-0">
-                    <p className="text-xs text-amber-300 font-medium">
-                      You need Arbitrum Sepolia ETH to mint
-                    </p>
-                    <p className="text-xs text-amber-300/60">
-                      Get free test ETH from the Alchemy faucet — takes ~30 seconds.
-                    </p>
-                    <a
-                      href="https://www.alchemy.com/faucets/arbitrum-sepolia"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1 text-xs text-amber-400 hover:text-amber-300 font-medium transition-colors mt-1"
-                    >
-                      Get test ETH →
-                      <ExternalLink className="w-3 h-3" />
-                    </a>
-                  </div>
-                </div>
-              )}
-
-              {/* Mint button */}
+              {/* Mint button — always active for signed-in users; gas is
+                  sponsored, so there is no balance requirement. */}
               <button
                 onClick={handleMint}
-                disabled={!displayName.trim() || !hasBalance}
+                disabled={!displayName.trim()}
                 className="w-full py-3 bg-yellow-400 hover:bg-yellow-300 disabled:opacity-40 disabled:cursor-not-allowed text-black font-semibold rounded-xl transition-colors flex items-center justify-center gap-2"
               >
                 <User className="w-4 h-4" />
-                {hasBalance ? "Mint my KLIPP Card" : "Need ETH to mint"}
+                Mint my card
               </button>
+
+              <p className="text-center text-xs text-white/30">
+                No gas, no wallet popup — minting is on us.
+              </p>
 
               {walletAddress && (
                 <p className="text-center text-xs text-white/20 font-mono">
                   {walletAddress.slice(0, 6)}…{walletAddress.slice(-4)}
-                  {" · "}
-                  {balance ? `${(Number(balance.value) / 1e18).toFixed(4)} ETH` : "checking…"}
                 </p>
               )}
             </motion.div>
@@ -435,12 +398,11 @@ export default function OnboardPage() {
 
               {/* Stage indicators */}
               <div className="space-y-2 text-left max-w-xs mx-auto">
-                {(["uploading", "switching-chain", "waiting-wallet", "confirming", "saving"] as MintStage[]).map(
+                {(["uploading", "submitting", "confirming", "saving"] as MintStage[]).map(
                   (stage, i) => {
                     const stages: MintStage[] = [
                       "uploading",
-                      "switching-chain",
-                      "waiting-wallet",
+                      "submitting",
                       "confirming",
                       "saving",
                     ];

@@ -19,6 +19,7 @@
     "framer-motion": "^12.40.0",
     "lucide-react": "^1.16.0",
     "next": "14.2.35",
+    "permissionless": "^0.2.57",
     "react": "^18",
     "react-dom": "^18",
     "react-hook-form": "^7.76.1",

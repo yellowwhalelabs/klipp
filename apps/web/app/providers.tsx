@@ -1,6 +1,7 @@
 "use client";
 
 import { PrivyProvider } from "@privy-io/react-auth";
+import { SmartWalletsProvider } from "@privy-io/react-auth/smart-wallets";
 import { WagmiProvider, createConfig } from "@privy-io/wagmi";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { arbitrumSepolia } from "viem/chains";
@@ -81,11 +82,28 @@ export function Providers({ children }: { children: React.ReactNode }) {
         supportedChains: [arbitrumSepolia, robinhoodTestnet],
       }}
     >
-      <QueryClientProvider client={queryClient}>
-        <WagmiProvider config={wagmiConfig}>
-          {children}
-        </WagmiProvider>
-      </QueryClientProvider>
+      {/*
+        Smart wallets (ERC-4337) turn each user's embedded wallet into an account
+        that can use a paymaster, so mints are gasless. The smart-wallet
+        implementation (Alchemy) and its bundler + Gas Manager paymaster URL —
+        which embeds the Alchemy API key — are configured in the PRIVY DASHBOARD
+        (Smart Wallets settings). Here we only pass the Gas Manager policy id as
+        the paymaster context so Alchemy sponsors the UserOperation; if the env
+        var is unset, Privy falls back to the policy configured in the dashboard.
+      */}
+      <SmartWalletsProvider
+        config={{
+          paymasterContext: {
+            policyId: process.env.NEXT_PUBLIC_ALCHEMY_GAS_POLICY_ID,
+          },
+        }}
+      >
+        <QueryClientProvider client={queryClient}>
+          <WagmiProvider config={wagmiConfig}>
+            {children}
+          </WagmiProvider>
+        </QueryClientProvider>
+      </SmartWalletsProvider>
     </PrivyProvider>
   );
 }
