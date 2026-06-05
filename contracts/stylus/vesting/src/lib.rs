@@ -30,6 +30,13 @@
 #![cfg_attr(all(not(any(test, feature = "export-abi")), target_arch = "wasm32"), no_main)]
 extern crate alloc;
 
+// Under the export-abi feature, the #[entrypoint] macro generates
+// `pub fn print_abi(license, pragma)` inside `mod contract`. Re-export it at the
+// crate root so the ABI-export binary (src/main.rs) — invoked by
+// `cargo stylus deploy` via `cargo run --features export-abi` — can call it.
+#[cfg(feature = "export-abi")]
+pub use contract::print_abi;
+
 // ---------------------------------------------------------------------------
 // Pure vesting math — no external dependencies
 // ---------------------------------------------------------------------------
