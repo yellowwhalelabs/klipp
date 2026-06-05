@@ -119,10 +119,14 @@ jobs:
           # --estimate-gas only simulates; it does not send a transaction. We
           # surface the prediction in the job summary BEFORE broadcasting so the
           # cost is visible up front.
+          # --no-verify: skip cargo-stylus's Docker-based reproducible rebuild
+          # (not available in this runner — fails with "os error 2"); deploy the
+          # wasm we just built and validated with `cargo stylus check`.
           EST_OUT="$(cargo stylus deploy \
                 --features contract \
                 --endpoint "${RPC_URL}" \
                 --private-key-path "$KEYFILE" \
+                --no-verify \
                 --estimate-gas 2>&1 || true)"
           GAS_ESTIMATE=$(printf '%s' "$EST_OUT" | grep -oiE 'gas[^0-9]{0,24}[0-9][0-9,_]*' | grep -oE '[0-9][0-9,_]*' | tail -1 || true)
           PREDICTED_ADDR=$(printf '%s' "$EST_OUT" | grep -oiP '0x[0-9a-fA-F]{40}(?![0-9a-fA-F])' | head -1 || true)
@@ -146,7 +150,8 @@ jobs:
           DEPLOY_OUT="$(cargo stylus deploy \
                 --features contract \
                 --endpoint "${RPC_URL}" \
-                --private-key-path "$KEYFILE" 2>&1 || true)"
+                --private-key-path "$KEYFILE" \
+                --no-verify 2>&1 || true)"
 
           # Parse the 64-char tx hash FIRST, then the 40-char address with a PCRE
           # negative-lookahead so it can't grab the leading 40 hex of a 64 hash.
