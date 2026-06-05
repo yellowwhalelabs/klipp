@@ -144,19 +144,32 @@ jobs:
           printf '%s\n' "$EST_OUT" | sed -E 's/[0-9a-fA-F]{64}/<redacted64>/g'
           echo "----- end estimate output -----"
 
-          # ── 2) Real deploy (BROADCASTS the transaction) ─────────────────────
-          # Output captured in-memory and only known-safe public fields parsed
-          # out — never echoed wholesale, so a stray key print can't leak.
-          DEPLOY_OUT="$(cargo stylus deploy \
-                --features contract \
-                --endpoint "${RPC_URL}" \
-                --private-key-path "$KEYFILE" \
-                --no-verify 2>&1 || true)"
+          # ── 2) Real deploy (BROADCASTS the transaction), with retry ─────────
+          # Arbitrum Sepolia's base fee oscillates around the ~0.02 gwei maxFee
+          # cargo-stylus uses, so a submission can be rejected with "max fee per
+          # gas less than block base fee". Retry a few times to catch a dip.
+          DEPLOY_OUT=""
+          ADDR=""
+          for attempt in 1 2 3 4 5 6 7 8; do
+            DEPLOY_OUT="$(cargo stylus deploy \
+                  --features contract \
+                  --endpoint "${RPC_URL}" \
+                  --private-key-path "$KEYFILE" \
+                  --no-verify 2>&1 || true)"
+            # Parse the contract address ONLY from the success line, so an address
+            # embedded in an error message (e.g. the deployer) can't fake success.
+            ADDR=$(printf '%s' "$DEPLOY_OUT" | grep -oiE 'deployed code at address:?[[:space:]]*0x[0-9a-fA-F]{40}' | grep -oiE '0x[0-9a-fA-F]{40}' | head -1 || true)
+            [ -n "$ADDR" ] && break
+            if printf '%s' "$DEPLOY_OUT" | grep -qiE 'max fee per gas less than block base fee|less than block base fee'; then
+              echo "Attempt ${attempt}: base-fee rejection — retrying in 15s..."
+              sleep 15
+              continue
+            fi
+            break   # a different, non-transient error — stop retrying
+          done
 
-          # Parse the 64-char tx hash FIRST, then the 40-char address with a PCRE
-          # negative-lookahead so it can't grab the leading 40 hex of a 64 hash.
-          TXHASH=$(printf '%s' "$DEPLOY_OUT" | grep -oiE '0x[0-9a-fA-F]{64}' | head -1 || true)
-          ADDR=$(printf '%s' "$DEPLOY_OUT"   | grep -oiP '0x[0-9a-fA-F]{40}(?![0-9a-fA-F])' | head -1 || true)
+          # tx hash + block from the success output (anchored to their labels).
+          TXHASH=$(printf '%s' "$DEPLOY_OUT" | grep -oiE '(tx hash|transaction hash)[^0-9a-fA-F]*0x[0-9a-fA-F]{64}' | grep -oiE '0x[0-9a-fA-F]{64}' | head -1 || true)
           BLOCK=$(printf '%s' "$DEPLOY_OUT"  | grep -oiE 'block:? *[0-9]+' | grep -oE '[0-9]+' | head -1 || true)
 
           # Diagnostic: surface the deploy output with any 64-hex run masked.
@@ -164,9 +177,9 @@ jobs:
           printf '%s\n' "$DEPLOY_OUT" | sed -E 's/[0-9a-fA-F]{64}/<redacted64>/g'
           echo "----- end deploy output -----"
 
-          # If we couldn't parse an address, fail (error visible in output above).
+          # Fail unless we got a real "deployed code at address" line.
           if [ -z "$ADDR" ]; then
-            echo "::error::Deploy produced no parseable contract address (see redacted output above)."
+            echo "::error::Deploy failed — no 'deployed code at address' in output (see redacted output above)."
             exit 1
           fi
 
