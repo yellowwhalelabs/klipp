@@ -134,6 +134,11 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
           echo "Predicted address: ${PREDICTED_ADDR:-<unparsed>}"
           echo "Gas estimate: ${GAS_ESTIMATE:-<unparsed>}"
+          # Diagnostic: surface the estimate output with any 64-hex run masked
+          # (covers a private key and tx hashes; GitHub also auto-masks secrets).
+          echo "----- estimate output (64-hex redacted) -----"
+          printf '%s\n' "$EST_OUT" | sed -E 's/[0-9a-fA-F]{64}/<redacted64>/g'
+          echo "----- end estimate output -----"
 
           # ── 2) Real deploy (BROADCASTS the transaction) ─────────────────────
           # Output captured in-memory and only known-safe public fields parsed
@@ -149,9 +154,14 @@ jobs:
           ADDR=$(printf '%s' "$DEPLOY_OUT"   | grep -oiP '0x[0-9a-fA-F]{40}(?![0-9a-fA-F])' | head -1 || true)
           BLOCK=$(printf '%s' "$DEPLOY_OUT"  | grep -oiE 'block:? *[0-9]+' | grep -oE '[0-9]+' | head -1 || true)
 
-          # If we couldn't parse an address, fail WITHOUT dumping raw output.
+          # Diagnostic: surface the deploy output with any 64-hex run masked.
+          echo "----- deploy output (64-hex redacted) -----"
+          printf '%s\n' "$DEPLOY_OUT" | sed -E 's/[0-9a-fA-F]{64}/<redacted64>/g'
+          echo "----- end deploy output -----"
+
+          # If we couldn't parse an address, fail (error visible in output above).
           if [ -z "$ADDR" ]; then
-            echo "::error::Deploy produced no parseable contract address. Raw output withheld to avoid leaking secrets."
+            echo "::error::Deploy produced no parseable contract address (see redacted output above)."
             exit 1
           fi
 
