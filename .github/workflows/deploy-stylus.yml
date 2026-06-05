@@ -115,49 +115,94 @@ jobs:
           trap cleanup EXIT
           printf '%s' "$DEPLOYER_KEY" > "$KEYFILE"
 
-          # Capture deploy output into a shell variable held in memory — it is
-          # NOT written to any file in the repo. We deliberately parse only the
-          # known-safe public fields below rather than echoing the whole blob.
+          # ── 1) Gas estimate + predicted address (NO broadcast) ──────────────
+          # --estimate-gas only simulates; it does not send a transaction. We
+          # surface the prediction in the job summary BEFORE broadcasting so the
+          # cost is visible up front.
+          EST_OUT="$(cargo stylus deploy \
+                --features contract \
+                --endpoint "${RPC_URL}" \
+                --private-key-path "$KEYFILE" \
+                --estimate-gas 2>&1 || true)"
+          GAS_ESTIMATE=$(printf '%s' "$EST_OUT" | grep -oiE 'gas[^0-9]{0,24}[0-9][0-9,_]*' | grep -oE '[0-9][0-9,_]*' | tail -1 || true)
+          PREDICTED_ADDR=$(printf '%s' "$EST_OUT" | grep -oiP '0x[0-9a-fA-F]{40}(?![0-9a-fA-F])' | head -1 || true)
+          {
+            echo "## KLIPPVesting — pre-deploy estimate (${{ inputs.network }})"
+            echo "- **Predicted address**: \`${PREDICTED_ADDR:-<unparsed>}\`"
+            echo "- **Gas estimate**: ${GAS_ESTIMATE:-<unparsed>}"
+            echo ""
+          } >> "$GITHUB_STEP_SUMMARY"
+          echo "Predicted address: ${PREDICTED_ADDR:-<unparsed>}"
+          echo "Gas estimate: ${GAS_ESTIMATE:-<unparsed>}"
+
+          # ── 2) Real deploy (BROADCASTS the transaction) ─────────────────────
+          # Output captured in-memory and only known-safe public fields parsed
+          # out — never echoed wholesale, so a stray key print can't leak.
           DEPLOY_OUT="$(cargo stylus deploy \
                 --features contract \
                 --endpoint "${RPC_URL}" \
                 --private-key-path "$KEYFILE" 2>&1 || true)"
 
-          # Public on-chain facts only. Parse the 64-char tx hash FIRST, then
-          # match the 40-char address with a PCRE negative-lookahead so it can
-          # never grab the leading 40 hex of a 64-char hash.
+          # Parse the 64-char tx hash FIRST, then the 40-char address with a PCRE
+          # negative-lookahead so it can't grab the leading 40 hex of a 64 hash.
           TXHASH=$(printf '%s' "$DEPLOY_OUT" | grep -oiE '0x[0-9a-fA-F]{64}' | head -1 || true)
           ADDR=$(printf '%s' "$DEPLOY_OUT"   | grep -oiP '0x[0-9a-fA-F]{40}(?![0-9a-fA-F])' | head -1 || true)
           BLOCK=$(printf '%s' "$DEPLOY_OUT"  | grep -oiE 'block:? *[0-9]+' | grep -oE '[0-9]+' | head -1 || true)
 
-          # If we couldn't parse an address, fail WITHOUT dumping raw output
-          # (raw output is withheld so a stray key echo from the tool can't leak).
+          # If we couldn't parse an address, fail WITHOUT dumping raw output.
           if [ -z "$ADDR" ]; then
-            echo "::error::Deploy produced no parseable contract address. Raw output withheld to avoid leaking secrets. Re-run with dry_run=true to debug the check step."
+            echo "::error::Deploy produced no parseable contract address. Raw output withheld to avoid leaking secrets."
             exit 1
           fi
 
-          echo "DEPLOYED_ADDRESS=$ADDR"   >> "$GITHUB_ENV"
-          echo "DEPLOYED_TXHASH=$TXHASH"  >> "$GITHUB_ENV"
-          echo "DEPLOYED_BLOCK=$BLOCK"    >> "$GITHUB_ENV"
+          # ── 3) Authoritative gas used from the tx receipt (non-fatal) ───────
+          # Everything below must NOT fail the step — the contract is already
+          # deployed at this point, so a receipt hiccup shouldn't mark it red.
+          GAS_USED=""
+          if [ -n "$TXHASH" ]; then
+            for _ in 1 2 3 4 5 6 7 8; do
+              RCPT="$(curl -s -X POST "$RPC_URL" -H 'content-type: application/json' \
+                --data '{"jsonrpc":"2.0","id":1,"method":"eth_getTransactionReceipt","params":["'"$TXHASH"'"]}' || true)"
+              GU_HEX="$(printf '%s' "$RCPT" | grep -oiE '"gasUsed"[[:space:]]*:[[:space:]]*"0x[0-9a-f]+"' | grep -oiE '0x[0-9a-f]+' | head -1 || true)"
+              if [ -n "$GU_HEX" ]; then
+                GAS_USED="$(printf '%d' "$GU_HEX" 2>/dev/null || true)"
+                break
+              fi
+              sleep 3
+            done
+          fi
 
-          # All three are public on-chain data — safe to log.
+          echo "DEPLOYED_ADDRESS=$ADDR"      >> "$GITHUB_ENV"
+          echo "DEPLOYED_TXHASH=$TXHASH"     >> "$GITHUB_ENV"
+          echo "DEPLOYED_BLOCK=$BLOCK"       >> "$GITHUB_ENV"
+          echo "DEPLOYED_GAS_USED=$GAS_USED" >> "$GITHUB_ENV"
+
+          # All public on-chain data — safe to log.
           echo "✅ KLIPPVesting deployed"
-          echo "   Address: $ADDR"
-          echo "   Tx hash: ${TXHASH:-<unparsed>}"
-          echo "   Block:   ${BLOCK:-<unparsed>}"
+          echo "   Address:  $ADDR"
+          echo "   Tx hash:  ${TXHASH:-<unparsed>}"
+          echo "   Block:    ${BLOCK:-<unparsed>}"
+          echo "   Gas used: ${GAS_USED:-<unparsed>}"
 
-      - name: Update deployments JSON
+      - name: Deployment summary
+        # No repo commit here — the deployment records (deployments/*.json and
+        # apps/web/.env.local) are written and committed outside CI. This step
+        # only surfaces the public on-chain facts in the run summary.
         if: ${{ inputs.dry_run != true && inputs.dry_run != 'true' && env.DEPLOYED_ADDRESS != '' }}
         run: |
-          cd ../../..  # back to repo root
-          # Update the PENDING address in deployments/stylus-sepolia.json
-          sed -i "s/\"PENDING\"/\"${{ env.DEPLOYED_ADDRESS }}\"/" deployments/stylus-sepolia.json
-          git config user.name  "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add deployments/stylus-sepolia.json
-          git commit -m "chore: update KLIPPVesting address → ${{ env.DEPLOYED_ADDRESS }}" || true
-          git push || true
+          EXPLORER="https://sepolia.arbiscan.io"
+          if [ "${{ inputs.network }}" = "robinhood-testnet" ]; then
+            EXPLORER="https://explorer.testnet.chain.robinhood.com"
+          fi
+          {
+            echo "## KLIPPVesting — deployed ✅"
+            echo "- **Network**: ${{ inputs.network }}"
+            echo "- **Address**: \`${{ env.DEPLOYED_ADDRESS }}\`"
+            echo "- **Tx hash**: \`${{ env.DEPLOYED_TXHASH }}\`"
+            echo "- **Block**: ${{ env.DEPLOYED_BLOCK }}"
+            echo "- **Gas used**: ${{ env.DEPLOYED_GAS_USED }}"
+            echo "- **Explorer**: ${EXPLORER}/address/${{ env.DEPLOYED_ADDRESS }}"
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Summary
         run: |
