@@ -156,11 +156,16 @@ jobs:
                   --endpoint "${RPC_URL}" \
                   --private-key-path "$KEYFILE" \
                   --no-verify 2>&1 || true)"
+            # cargo-stylus colorizes the address, so strip ANSI escapes BEFORE
+            # parsing — otherwise an escape sits between "address:" and "0x" and
+            # the anchored regex misses it (which previously made a real on-chain
+            # deploy look like a failure).
+            DEPLOY_CLEAN="$(printf '%s' "$DEPLOY_OUT" | sed -E 's/\x1b\[[0-9;]*m//g')"
             # Parse the contract address ONLY from the success line, so an address
             # embedded in an error message (e.g. the deployer) can't fake success.
-            ADDR=$(printf '%s' "$DEPLOY_OUT" | grep -oiE 'deployed code at address:?[[:space:]]*0x[0-9a-fA-F]{40}' | grep -oiE '0x[0-9a-fA-F]{40}' | head -1 || true)
+            ADDR=$(printf '%s' "$DEPLOY_CLEAN" | grep -oiE 'deployed code at address:?[[:space:]]*0x[0-9a-fA-F]{40}' | grep -oiE '0x[0-9a-fA-F]{40}' | head -1 || true)
             [ -n "$ADDR" ] && break
-            if printf '%s' "$DEPLOY_OUT" | grep -qiE 'max fee per gas less than block base fee|less than block base fee'; then
+            if printf '%s' "$DEPLOY_CLEAN" | grep -qiE 'less than block base fee'; then
               echo "Attempt ${attempt}: base-fee rejection — retrying in 15s..."
               sleep 15
               continue
@@ -168,9 +173,9 @@ jobs:
             break   # a different, non-transient error — stop retrying
           done
 
-          # tx hash + block from the success output (anchored to their labels).
-          TXHASH=$(printf '%s' "$DEPLOY_OUT" | grep -oiE '(tx hash|transaction hash)[^0-9a-fA-F]*0x[0-9a-fA-F]{64}' | grep -oiE '0x[0-9a-fA-F]{64}' | head -1 || true)
-          BLOCK=$(printf '%s' "$DEPLOY_OUT"  | grep -oiE 'block:? *[0-9]+' | grep -oE '[0-9]+' | head -1 || true)
+          # tx hash + block from the (ANSI-stripped) success output.
+          TXHASH=$(printf '%s' "$DEPLOY_CLEAN" | grep -oiE '(tx hash|transaction hash)[^0-9a-fA-F]*0x[0-9a-fA-F]{64}' | grep -oiE '0x[0-9a-fA-F]{64}' | head -1 || true)
+          BLOCK=$(printf '%s' "$DEPLOY_CLEAN"  | grep -oiE 'block:? *[0-9]+' | grep -oE '[0-9]+' | head -1 || true)
 
           # Diagnostic: surface the deploy output with any 64-hex run masked.
           echo "----- deploy output (64-hex redacted) -----"

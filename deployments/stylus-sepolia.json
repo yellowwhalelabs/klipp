@@ -5,11 +5,15 @@
   "deployer": "0xE24a4342fE047321Ed8bb1a4571bF87B55646680",
   "contracts": {
     "KLIPPVesting": {
-      "address": "PENDING",
-      "txHash": "PENDING",
+      "address": "0xAce3a7b296E41B03bC77e91D2a0375B4Ea279B80",
+      "txHash": "0x2c68828871d6c8050f88441c86076d0de678e4186748eb3bbacf09573433d7e6",
+      "activationTxHash": "0x78c3a89d05938b88967b9a0d5796b6863ec20d7df0e0651e50892f62505f23bd",
+      "blockNumber": 274051400,
+      "deployGasUsed": 4828056,
+      "activationGasUsed": 2707397,
       "verified": false,
-      "rustVersion": "1.96",
-      "stylusSdkVersion": "0.6.1",
+      "rustVersion": "1.90.0",
+      "stylusSdkVersion": "0.8.4",
       "wasmTarget": "wasm32-unknown-unknown",
       "interface": "IVesting",
       "functions": [
