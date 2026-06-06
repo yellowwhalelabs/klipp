@@ -98,14 +98,18 @@ export default function OnboardPage() {
   const [txHash, setTxHash]           = useState<`0x${string}` | null>(null);
   const fileInputRef                  = useRef<HTMLInputElement>(null);
 
-  // Embedded wallet (Privy EOA). It starts with zero gas, so once the user is
-  // signed in we invisibly top it up from the deployer faucet (/api/fund-wallet)
+  // Embedded wallet (Privy EOA). It starts with zero gas, so once the wallet is
+  // connected we invisibly top it up from the deployer faucet (/api/fund-wallet)
   // before enabling the mint — the user never sees a gas/funding step.
+  //
+  // IMPORTANT: gate everything on the embedded wallet OBJECT from useWallets()
+  // (not user.wallet.address), because signing needs the object's
+  // getEthereumProvider()/switchChain(). useWallets() populates asynchronously,
+  // so falling back to user.wallet.address would enable the button before the
+  // wallet can actually sign — exactly the "click does nothing" symptom.
   const { wallets } = useWallets();
   const embeddedWallet = wallets.find((w) => w.walletClientType === "privy");
-  const walletAddress = (embeddedWallet?.address ??
-    user?.wallet?.address ??
-    "") as `0x${string}`;
+  const walletAddress = (embeddedWallet?.address ?? "") as `0x${string}`;
 
   const publicClient = usePublicClient({ chainId: arbitrumSepolia.id });
 
@@ -114,6 +118,15 @@ export default function OnboardPage() {
   const [walletStatus, setWalletStatus] =
     useState<"checking" | "funding" | "ready">("checking");
   const fundingStartedRef = useRef(false); // attempt the top-up at most once
+
+  // [debug] watch the embedded wallet populate (remove once mint is confirmed).
+  useEffect(() => {
+    console.log(
+      "[onboard] wallets:", wallets.length,
+      "| embedded:", embeddedWallet?.address ?? "(none yet)",
+      "| status:", walletStatus
+    );
+  }, [wallets, embeddedWallet?.address, walletStatus]);
 
   // ── Auth gate ──────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -135,12 +148,15 @@ export default function OnboardPage() {
       try {
         const balance = await publicClient.getBalance({ address: walletAddress });
         if (cancelled) return;
+        console.log("[onboard] faucet: balance of", walletAddress, "=", balance.toString(), "wei");
         if (balance >= MIN_BALANCE_WEI) {
+          console.log("[onboard] faucet: already funded, skipping top-up");
           setWalletStatus("ready");
           return;
         }
 
         setWalletStatus("funding");
+        console.log("[onboard] faucet: POST /api/fund-wallet", walletAddress);
         const res = await fetch("/api/fund-wallet", {
           method:  "POST",
           headers: { "Content-Type": "application/json" },
@@ -148,17 +164,18 @@ export default function OnboardPage() {
         });
         const json = await res.json().catch(() => ({ success: false }));
         if (cancelled) return;
+        console.log("[onboard] faucet: response", res.status, json);
 
         // Whether we just funded or it was already funded, the wallet should now
         // have gas. If the faucet failed we still let the user try to mint — the
         // mint will surface any real error rather than blocking on the faucet.
         if (!json.success) {
-          console.warn("[onboard] faucet:", json.reason ?? "unknown");
+          console.warn("[onboard] faucet failed:", json.reason ?? "unknown");
         }
         setWalletStatus("ready");
       } catch (err) {
         if (cancelled) return;
-        console.warn("[onboard] wallet readiness check failed:", err);
+        console.error("[onboard] wallet readiness check failed:", err);
         setWalletStatus("ready"); // fail open — don't permanently block minting
       }
     })();
@@ -179,11 +196,22 @@ export default function OnboardPage() {
 
   // ── Main mint flow ─────────────────────────────────────────────────────────
   async function handleMint() {
+    console.log("1. Mint button clicked");
+    console.log("2. Wallets:", wallets);
+    console.log("3. Active (embedded) wallet:", embeddedWallet);
+    console.log("4. Wallet address:", walletAddress);
+
     if (!displayName.trim()) {
+      console.warn("MINT BLOCKED: empty display name");
       toast.error("Please enter a display name");
       return;
     }
     if (!embeddedWallet || !walletAddress) {
+      console.error("MINT BLOCKED: embedded wallet not ready", {
+        embeddedWallet,
+        walletAddress,
+        walletCount: wallets.length,
+      });
       toast.error("Your wallet is still setting up — give it a second and try again.");
       return;
     }
@@ -218,19 +246,23 @@ export default function OnboardPage() {
       // call mint directly. Gas is paid from the wallet's balance, which the
       // invisible faucet topped up on load.
       setMintStage("submitting");
+      console.log("5. Switching chain → Arbitrum Sepolia");
       await embeddedWallet.switchChain(arbitrumSepolia.id);
+      console.log("6. Getting provider + building wallet client");
       const provider = await embeddedWallet.getEthereumProvider();
       const walletClient = createWalletClient({
         account:   walletAddress,
         chain:     arbitrumSepolia,
         transport: custom(provider),
       });
+      console.log("7. About to call writeContract(mint)", { to: CONTRACTS.SOULBOUND_CARD, metadataUri });
       const hash = await walletClient.writeContract({
         address:      CONTRACTS.SOULBOUND_CARD,
         abi:          SOULBOUND_CARD_ABI,
         functionName: "mint",
         args:         [metadataUri],
       });
+      console.log("8. mint tx submitted:", hash);
 
       setTxHash(hash);
 
@@ -268,6 +300,7 @@ export default function OnboardPage() {
       toast.success("KLIPP Card minted! 🎉");
       setTimeout(() => router.push("/dashboard"), 2500);
     } catch (err: unknown) {
+      console.error("MINT ERROR:", err);
       const msg =
         err instanceof Error ? err.message : "Minting failed. Try again.";
       toast.error(msg.length > 80 ? "Minting failed. Check your wallet and try again." : msg);
@@ -415,14 +448,22 @@ export default function OnboardPage() {
                 </div>
               </div>
 
-              {/* Mint button — enabled once the embedded wallet has been topped
-                  up by the invisible faucet and a display name is set. */}
+              {/* Mint button — enabled only once the embedded wallet is actually
+                  connected (object present, not just its address) AND topped up
+                  by the invisible faucet AND a display name is set. Gating on the
+                  embedded wallet object prevents the button going active before
+                  the wallet can sign (the "click does nothing" bug). */}
               <button
                 onClick={handleMint}
-                disabled={!displayName.trim() || walletStatus !== "ready"}
+                disabled={!displayName.trim() || !embeddedWallet || walletStatus !== "ready"}
                 className="w-full py-3 bg-yellow-400 hover:bg-yellow-300 disabled:opacity-40 disabled:cursor-not-allowed text-black font-semibold rounded-xl transition-colors flex items-center justify-center gap-2"
               >
-                {walletStatus !== "ready" ? (
+                {!embeddedWallet ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Connecting wallet…
+                  </>
+                ) : walletStatus !== "ready" ? (
                   <>
                     <Loader2 className="w-4 h-4 animate-spin" />
                     Getting your wallet ready…
