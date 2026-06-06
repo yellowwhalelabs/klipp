@@ -1,12 +1,11 @@
 "use client";
 
-import { usePrivy } from "@privy-io/react-auth";
-import { useSmartWallets } from "@privy-io/react-auth/smart-wallets";
+import { usePrivy, useWallets } from "@privy-io/react-auth";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
-import { encodeFunctionData } from "viem";
+import { createWalletClient, custom, parseEther } from "viem";
 import { arbitrumSepolia } from "viem/chains";
 import { usePublicClient } from "wagmi";
 import {
@@ -31,10 +30,14 @@ type MintStage =
 
 const STAGE_TEXT: Record<MintStage, string> = {
   uploading:  "Uploading your avatar…",
-  submitting: "Minting your card (gas sponsored)…",
+  submitting: "Minting your card…",
   confirming: "Confirming on-chain (~5–10 s)…",
   saving:     "Saving your profile…",
 };
+
+// Minimum balance the embedded wallet needs to cover the mint's gas. Below this
+// we top it up invisibly via /api/fund-wallet before enabling the mint button.
+const MIN_BALANCE_WEI = parseEther("0.001");
 
 // ─── Storage helpers ─────────────────────────────────────────────────────────
 
@@ -95,23 +98,75 @@ export default function OnboardPage() {
   const [txHash, setTxHash]           = useState<`0x${string}` | null>(null);
   const fileInputRef                  = useRef<HTMLInputElement>(null);
 
-  // Smart-account (ERC-4337) client — mints are sent as sponsored
-  // UserOperations through the Alchemy Gas Manager paymaster, so the user
-  // never needs ETH. The card is owned by the smart-account address (the
-  // UserOp's msg.sender), so we key the profile/storage on it.
-  const { client: smartWalletClient } = useSmartWallets();
-  const walletAddress = (smartWalletClient?.account?.address ??
-    user?.smartWallet?.address ??
+  // Embedded wallet (Privy EOA). It starts with zero gas, so once the user is
+  // signed in we invisibly top it up from the deployer faucet (/api/fund-wallet)
+  // before enabling the mint — the user never sees a gas/funding step.
+  const { wallets } = useWallets();
+  const embeddedWallet = wallets.find((w) => w.walletClientType === "privy");
+  const walletAddress = (embeddedWallet?.address ??
     user?.wallet?.address ??
     "") as `0x${string}`;
 
   const publicClient = usePublicClient({ chainId: arbitrumSepolia.id });
+
+  // Funding gate: "checking" → balance unknown; "funding" → topping up;
+  // "ready" → wallet has gas, mint button enabled.
+  const [walletStatus, setWalletStatus] =
+    useState<"checking" | "funding" | "ready">("checking");
+  const fundingStartedRef = useRef(false); // attempt the top-up at most once
 
   // ── Auth gate ──────────────────────────────────────────────────────────────
   useEffect(() => {
     if (!ready) return;
     if (authenticated) setStep("profile");
   }, [ready, authenticated]);
+
+  // ── Invisible faucet: ensure the embedded wallet has gas ─────────────────────
+  // On sign-in we check the wallet balance; if it's below the mint threshold we
+  // call the server faucet to top it up, then mark the wallet ready. All of this
+  // is silent — the UI just shows a brief "Getting your wallet ready…".
+  useEffect(() => {
+    if (!authenticated || !walletAddress || !publicClient) return;
+    if (fundingStartedRef.current) return;
+    fundingStartedRef.current = true;
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const balance = await publicClient.getBalance({ address: walletAddress });
+        if (cancelled) return;
+        if (balance >= MIN_BALANCE_WEI) {
+          setWalletStatus("ready");
+          return;
+        }
+
+        setWalletStatus("funding");
+        const res = await fetch("/api/fund-wallet", {
+          method:  "POST",
+          headers: { "Content-Type": "application/json" },
+          body:    JSON.stringify({ address: walletAddress }),
+        });
+        const json = await res.json().catch(() => ({ success: false }));
+        if (cancelled) return;
+
+        // Whether we just funded or it was already funded, the wallet should now
+        // have gas. If the faucet failed we still let the user try to mint — the
+        // mint will surface any real error rather than blocking on the faucet.
+        if (!json.success) {
+          console.warn("[onboard] faucet:", json.reason ?? "unknown");
+        }
+        setWalletStatus("ready");
+      } catch (err) {
+        if (cancelled) return;
+        console.warn("[onboard] wallet readiness check failed:", err);
+        setWalletStatus("ready"); // fail open — don't permanently block minting
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [authenticated, walletAddress, publicClient]);
 
   // ── Avatar picker ──────────────────────────────────────────────────────────
   function handleAvatarChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -128,7 +183,7 @@ export default function OnboardPage() {
       toast.error("Please enter a display name");
       return;
     }
-    if (!smartWalletClient || !walletAddress) {
+    if (!embeddedWallet || !walletAddress) {
       toast.error("Your wallet is still setting up — give it a second and try again.");
       return;
     }
@@ -158,19 +213,23 @@ export default function OnboardPage() {
       };
       const metadataUri = await uploadMetadata(metadata, walletAddress);
 
-      // ── 3. Mint KLIPPCard.mint(metadataUri) as a sponsored UserOperation ──
-      // The smart-account client signs invisibly with the embedded wallet and
-      // the Alchemy Gas Manager pays the gas — no wallet popup, no ETH, no chain
-      // switch (the client targets Arbitrum Sepolia directly).
+      // ── 3. Mint KLIPPCard.mint(metadataUri) from the embedded EOA ─────────
+      // Build a viem wallet client over the Privy embedded wallet's provider and
+      // call mint directly. Gas is paid from the wallet's balance, which the
+      // invisible faucet topped up on load.
       setMintStage("submitting");
-      const hash = await smartWalletClient.sendTransaction({
-        chain: arbitrumSepolia,
-        to:    CONTRACTS.SOULBOUND_CARD,
-        data:  encodeFunctionData({
-          abi:          SOULBOUND_CARD_ABI,
-          functionName: "mint",
-          args:         [metadataUri],
-        }),
+      await embeddedWallet.switchChain(arbitrumSepolia.id);
+      const provider = await embeddedWallet.getEthereumProvider();
+      const walletClient = createWalletClient({
+        account:   walletAddress,
+        chain:     arbitrumSepolia,
+        transport: custom(provider),
+      });
+      const hash = await walletClient.writeContract({
+        address:      CONTRACTS.SOULBOUND_CARD,
+        abi:          SOULBOUND_CARD_ABI,
+        functionName: "mint",
+        args:         [metadataUri],
       });
 
       setTxHash(hash);
@@ -356,15 +415,24 @@ export default function OnboardPage() {
                 </div>
               </div>
 
-              {/* Mint button — always active for signed-in users; gas is
-                  sponsored, so there is no balance requirement. */}
+              {/* Mint button — enabled once the embedded wallet has been topped
+                  up by the invisible faucet and a display name is set. */}
               <button
                 onClick={handleMint}
-                disabled={!displayName.trim()}
+                disabled={!displayName.trim() || walletStatus !== "ready"}
                 className="w-full py-3 bg-yellow-400 hover:bg-yellow-300 disabled:opacity-40 disabled:cursor-not-allowed text-black font-semibold rounded-xl transition-colors flex items-center justify-center gap-2"
               >
-                <User className="w-4 h-4" />
-                Mint my card
+                {walletStatus !== "ready" ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Getting your wallet ready…
+                  </>
+                ) : (
+                  <>
+                    <User className="w-4 h-4" />
+                    Mint my card
+                  </>
+                )}
               </button>
 
               <p className="text-center text-xs text-white/30">
