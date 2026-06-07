@@ -7,7 +7,20 @@
   "mockVesting": "0x1a8F98b493d6c66d255536701c4Eb7E6553e288C",
   "demoEquityToken": "0xAce3a7b296E41B03bC77e91D2a0375B4Ea279B80",
   "demoCapTable": "0x5e9bb5A815d2D6A81CAb1160f0A3b8BA35b4313D",
-  "vestingContract": "0x1a8F98b493d6c66d255536701c4Eb7E6553e288C",
-  "note": "mockVesting is a Solidity placeholder. Will be replaced with Stylus (Rust) address once cargo-stylus is installed and deployed.",
+  "vestingContract": "0xC9DCf36D93a12F6F2D991496feB9780e13B57142",
+  "klippVesting": {
+    "address": "0xC9DCf36D93a12F6F2D991496feB9780e13B57142",
+    "runtime": "Stylus (Rust → WASM)",
+    "deployTxHash": "0x06d1d668175642af37c6b3232a080552b402e30b214beef14e713c549d304726",
+    "activationTxHash": "0x8dbf0957d5f77324c7bc47b0de404aef7b9be873fdc6fc7630b16f266427b0ef",
+    "blockNumber": 70848968,
+    "deployGasUsed": 3398893,
+    "stylusSdkVersion": "0.8.4",
+    "rustToolchain": "1.90.0",
+    "interface": "IVesting",
+    "deployedAt": "2026-06-07",
+    "blockscoutUrl": "https://explorer.testnet.chain.robinhood.com/address/0xC9DCf36D93a12F6F2D991496feB9780e13B57142"
+  },
+  "note": "vestingContract now points to the Stylus (Rust) KLIPPVesting deployment (see klippVesting). mockVesting is the prior Solidity placeholder, kept for reference.",
   "explorer": "https://explorer.testnet.chain.robinhood.com"
 }
