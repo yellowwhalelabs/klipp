@@ -175,3 +175,5 @@ Built for the Arbitrum Open House Buildathon (May 25 – June 10, 2026).
 ## License
 
 MIT
+
+<!-- build: force fresh Vercel build to pick up env vars — 2026-06-07T06:53:29Z -->
