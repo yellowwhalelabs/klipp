@@ -119,15 +119,6 @@ export default function OnboardPage() {
     useState<"checking" | "funding" | "ready">("checking");
   const fundingStartedRef = useRef(false); // attempt the top-up at most once
 
-  // [debug] watch the embedded wallet populate (remove once mint is confirmed).
-  useEffect(() => {
-    console.log(
-      "[onboard] wallets:", wallets.length,
-      "| embedded:", embeddedWallet?.address ?? "(none yet)",
-      "| status:", walletStatus
-    );
-  }, [wallets, embeddedWallet?.address, walletStatus]);
-
   // ── Auth gate ──────────────────────────────────────────────────────────────
   useEffect(() => {
     if (!ready) return;
@@ -148,15 +139,12 @@ export default function OnboardPage() {
       try {
         const balance = await publicClient.getBalance({ address: walletAddress });
         if (cancelled) return;
-        console.log("[onboard] faucet: balance of", walletAddress, "=", balance.toString(), "wei");
         if (balance >= MIN_BALANCE_WEI) {
-          console.log("[onboard] faucet: already funded, skipping top-up");
           setWalletStatus("ready");
           return;
         }
 
         setWalletStatus("funding");
-        console.log("[onboard] faucet: POST /api/fund-wallet", walletAddress);
         const res = await fetch("/api/fund-wallet", {
           method:  "POST",
           headers: { "Content-Type": "application/json" },
@@ -164,13 +152,12 @@ export default function OnboardPage() {
         });
         const json = await res.json().catch(() => ({ success: false }));
         if (cancelled) return;
-        console.log("[onboard] faucet: response", res.status, json);
 
         // Whether we just funded or it was already funded, the wallet should now
         // have gas. If the faucet failed we still let the user try to mint — the
         // mint will surface any real error rather than blocking on the faucet.
         if (!json.success) {
-          console.warn("[onboard] faucet failed:", json.reason ?? "unknown");
+          console.error("[onboard] faucet top-up failed:", json.reason ?? "unknown");
         }
         setWalletStatus("ready");
       } catch (err) {
@@ -196,22 +183,11 @@ export default function OnboardPage() {
 
   // ── Main mint flow ─────────────────────────────────────────────────────────
   async function handleMint() {
-    console.log("1. Mint button clicked");
-    console.log("2. Wallets:", wallets);
-    console.log("3. Active (embedded) wallet:", embeddedWallet);
-    console.log("4. Wallet address:", walletAddress);
-
     if (!displayName.trim()) {
-      console.warn("MINT BLOCKED: empty display name");
       toast.error("Please enter a display name");
       return;
     }
     if (!embeddedWallet || !walletAddress) {
-      console.error("MINT BLOCKED: embedded wallet not ready", {
-        embeddedWallet,
-        walletAddress,
-        walletCount: wallets.length,
-      });
       toast.error("Your wallet is still setting up — give it a second and try again.");
       return;
     }
@@ -246,23 +222,19 @@ export default function OnboardPage() {
       // call mint directly. Gas is paid from the wallet's balance, which the
       // invisible faucet topped up on load.
       setMintStage("submitting");
-      console.log("5. Switching chain → Arbitrum Sepolia");
       await embeddedWallet.switchChain(arbitrumSepolia.id);
-      console.log("6. Getting provider + building wallet client");
       const provider = await embeddedWallet.getEthereumProvider();
       const walletClient = createWalletClient({
         account:   walletAddress,
         chain:     arbitrumSepolia,
         transport: custom(provider),
       });
-      console.log("7. About to call writeContract(mint)", { to: CONTRACTS.SOULBOUND_CARD, metadataUri });
       const hash = await walletClient.writeContract({
         address:      CONTRACTS.SOULBOUND_CARD,
         abi:          SOULBOUND_CARD_ABI,
         functionName: "mint",
         args:         [metadataUri],
       });
-      console.log("8. mint tx submitted:", hash);
 
       setTxHash(hash);
 
