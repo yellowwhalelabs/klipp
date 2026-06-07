@@ -1,19 +1,23 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
-// NOTE: clients are created lazily (on first use) rather than at module-eval
-// time. Next.js "collect page data" runs route modules during the build, where
-// these env vars may be absent — eager createClient(undefined, …) would throw
-// "supabaseUrl is required" and fail the build. Lazy init defers that to
-// runtime, when the env vars are present.
+// Env vars are referenced STATICALLY (process.env.NEXT_PUBLIC_FOO, never
+// process.env[name]) so that Next.js inlines the NEXT_PUBLIC_* values into the
+// client bundle. A dynamic lookup is never inlined and reads as `undefined` in
+// the browser — which is why the anon client failed at runtime ("supabaseUrl is
+// required") even though the var was set in Vercel.
+//
+// Clients are still created LAZILY (Proxy / function), not at module-eval time,
+// so the build's "collect page data" pass doesn't construct a client before the
+// vars exist.
 
-function readEnv(name: string): string {
-  const v = process.env[name];
-  if (!v) {
+function required(value: string | undefined, name: string): string {
+  if (!value) {
     throw new Error(
-      `[supabase] Missing required env var ${name}. Set it in your Vercel project (Settings → Environment Variables) and in .env.local for local dev.`
+      `[supabase] Missing required env var ${name}. Set it in Vercel ` +
+        `(Settings → Environment Variables) and in .env.local for local dev.`
     );
   }
-  return v;
+  return value;
 }
 
 // ── Client-side (anon key) ────────────────────────────────────────────────────
@@ -23,8 +27,8 @@ let _anonClient: SupabaseClient | null = null;
 function getAnonClient(): SupabaseClient {
   if (!_anonClient) {
     _anonClient = createClient(
-      readEnv("NEXT_PUBLIC_SUPABASE_URL"),
-      readEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY")
+      required(process.env.NEXT_PUBLIC_SUPABASE_URL, "NEXT_PUBLIC_SUPABASE_URL"),
+      required(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY, "NEXT_PUBLIC_SUPABASE_ANON_KEY")
     );
   }
   return _anonClient;
@@ -39,11 +43,12 @@ export const supabase: SupabaseClient = new Proxy({} as SupabaseClient, {
 });
 
 // ── Server-side (service role) ────────────────────────────────────────────────
-// Already lazy — only call this inside route handlers / server components.
+// Only call this inside route handlers / server components. SUPABASE_SERVICE_
+// ROLE_KEY is NOT NEXT_PUBLIC and is read at runtime on the server.
 export function createServiceClient(): SupabaseClient {
   return createClient(
-    readEnv("NEXT_PUBLIC_SUPABASE_URL"),
-    readEnv("SUPABASE_SERVICE_ROLE_KEY"),
+    required(process.env.NEXT_PUBLIC_SUPABASE_URL, "NEXT_PUBLIC_SUPABASE_URL"),
+    required(process.env.SUPABASE_SERVICE_ROLE_KEY, "SUPABASE_SERVICE_ROLE_KEY"),
     { auth: { persistSession: false } }
   );
 }
