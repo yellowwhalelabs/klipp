@@ -1,0 +1,93 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="920" height="540" viewBox="0 0 920 540" font-family="-apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif">
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L8,3 L0,6 Z" fill="#8a8a8a"/>
+    </marker>
+    <marker id="arrowGold" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L8,3 L0,6 Z" fill="#FFD700"/>
+    </marker>
+  </defs>
+
+  <!-- background -->
+  <rect x="0" y="0" width="920" height="540" fill="#0a0a0a"/>
+
+  <!-- title -->
+  <text x="32" y="40" fill="#FFD700" font-size="22" font-weight="700">KLIPP</text>
+  <text x="108" y="40" fill="#8a8a8a" font-size="15" font-weight="400">— system architecture</text>
+
+  <!-- ===================== LEFT: user → wallet → app ===================== -->
+  <!-- User -->
+  <rect x="40" y="78" width="180" height="48" rx="10" fill="#161616" stroke="#2a2a2a"/>
+  <text x="130" y="100" fill="#ffffff" font-size="14" font-weight="600" text-anchor="middle">User</text>
+  <text x="130" y="116" fill="#8a8a8a" font-size="11" text-anchor="middle">email · passkey</text>
+
+  <!-- arrow down -->
+  <line x1="130" y1="126" x2="130" y2="156" stroke="#8a8a8a" stroke-width="2" marker-end="url(#arrow)"/>
+
+  <!-- Privy embedded wallet (gold accent) -->
+  <rect x="40" y="158" width="180" height="56" rx="10" fill="#211d00" stroke="#FFD700" stroke-width="1.5"/>
+  <text x="130" y="182" fill="#FFD700" font-size="14" font-weight="600" text-anchor="middle">Privy Embedded Wallet</text>
+  <text x="130" y="200" fill="#cdbd5a" font-size="11" text-anchor="middle">real wallet · no seed phrase</text>
+
+  <!-- arrow down -->
+  <line x1="130" y1="214" x2="130" y2="244" stroke="#8a8a8a" stroke-width="2" marker-end="url(#arrow)"/>
+
+  <!-- Next.js / Vercel -->
+  <rect x="40" y="246" width="180" height="56" rx="10" fill="#161616" stroke="#2a2a2a"/>
+  <text x="130" y="270" fill="#ffffff" font-size="14" font-weight="600" text-anchor="middle">Next.js 14</text>
+  <text x="130" y="288" fill="#8a8a8a" font-size="11" text-anchor="middle">on Vercel</text>
+
+  <!-- arrow down to Supabase (double-headed) -->
+  <line x1="130" y1="302" x2="130" y2="352" stroke="#8a8a8a" stroke-width="2" marker-start="url(#arrow)" marker-end="url(#arrow)"/>
+
+  <!-- ===================== MIDDLE: Supabase ===================== -->
+  <rect x="40" y="354" width="180" height="70" rx="10" fill="#0f2a20" stroke="#3ECF8E" stroke-width="1.5"/>
+  <text x="130" y="378" fill="#3ECF8E" font-size="14" font-weight="600" text-anchor="middle">Supabase</text>
+  <text x="130" y="396" fill="#9fdcc2" font-size="10.5" text-anchor="middle">Postgres · Storage</text>
+  <text x="130" y="411" fill="#9fdcc2" font-size="10.5" text-anchor="middle">Edge Functions</text>
+
+  <!-- ===================== RAILS: app → chains ===================== -->
+  <!-- horizontal stub from Next.js right edge -->
+  <polyline points="220,274 360,274 360,150 468,150" fill="none" stroke="#FFD700" stroke-width="2" marker-end="url(#arrowGold)"/>
+  <polyline points="360,274 360,398 468,398" fill="none" stroke="#FFD700" stroke-width="2" marker-end="url(#arrowGold)"/>
+
+  <!-- ===================== RIGHT TOP: Arbitrum Sepolia ===================== -->
+  <rect x="470" y="62" width="416" height="178" rx="12" fill="#10202f" stroke="#28A0F0" stroke-width="1.5"/>
+  <text x="490" y="88" fill="#28A0F0" font-size="14" font-weight="700">Arbitrum Sepolia</text>
+  <text x="700" y="88" fill="#5a86a8" font-size="12" text-anchor="end">chain 421614</text>
+
+  <rect x="490" y="100" width="376" height="34" rx="8" fill="#161616" stroke="#2a3a4a"/>
+  <text x="506" y="121" fill="#e5e5e5" font-size="13">KLIPPCard <tspan fill="#8a8a8a" font-size="11">· soulbound NFT</tspan></text>
+
+  <rect x="490" y="140" width="376" height="34" rx="8" fill="#161616" stroke="#2a3a4a"/>
+  <text x="506" y="161" fill="#e5e5e5" font-size="13">KLIPPProCard <tspan fill="#8a8a8a" font-size="11">· verified credentials</tspan></text>
+
+  <rect x="490" y="180" width="376" height="38" rx="8" fill="#211d00" stroke="#FFD700" stroke-width="1.5"/>
+  <text x="506" y="203" fill="#FFD700" font-size="13" font-weight="600">★ KLIPPVesting <tspan fill="#cdbd5a" font-size="11" font-weight="400">· Stylus (Rust → WASM)</tspan></text>
+
+  <!-- ===================== RIGHT BOTTOM: Robinhood Chain ===================== -->
+  <rect x="470" y="300" width="416" height="200" rx="12" fill="#241141" stroke="#8B5CF6" stroke-width="1.5"/>
+  <text x="490" y="326" fill="#a78bfa" font-size="14" font-weight="700">Robinhood Chain</text>
+  <text x="700" y="326" fill="#7c6aa8" font-size="12" text-anchor="end">chain 46630</text>
+
+  <rect x="490" y="338" width="376" height="34" rx="8" fill="#1a1330" stroke="#3a2a5a"/>
+  <text x="506" y="359" fill="#e5e5e5" font-size="13">EquityTokenFactory</text>
+
+  <rect x="490" y="378" width="376" height="34" rx="8" fill="#1a1330" stroke="#3a2a5a"/>
+  <text x="506" y="399" fill="#e5e5e5" font-size="13">CapTable</text>
+
+  <rect x="490" y="418" width="376" height="38" rx="8" fill="#211d00" stroke="#FFD700" stroke-width="1.5"/>
+  <text x="506" y="441" fill="#FFD700" font-size="13" font-weight="600">★ KLIPPVesting <tspan fill="#cdbd5a" font-size="11" font-weight="400">· Stylus (Rust → WASM)</tspan></text>
+
+  <!-- footnote -->
+  <text x="490" y="478" fill="#7c6aa8" font-size="10.5">Same Rust contract, deployed unchanged across Arbitrum-Orbit chains.</text>
+
+  <!-- legend -->
+  <text x="32" y="470" fill="#8a8a8a" font-size="11" font-weight="600">Legend</text>
+  <rect x="32" y="480" width="12" height="12" rx="3" fill="#211d00" stroke="#FFD700"/>
+  <text x="50" y="490" fill="#cdbd5a" font-size="11">KLIPP / Stylus</text>
+  <rect x="150" y="480" width="12" height="12" rx="3" fill="#10202f" stroke="#28A0F0"/>
+  <text x="168" y="490" fill="#5a86a8" font-size="11">Arbitrum</text>
+  <rect x="250" y="480" width="12" height="12" rx="3" fill="#241141" stroke="#8B5CF6"/>
+  <text x="268" y="490" fill="#a78bfa" font-size="11">Robinhood</text>
+</svg>
