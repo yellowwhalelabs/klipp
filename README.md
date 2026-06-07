@@ -1,39 +1,78 @@
-# KLIPP
+<div align="center">
 
-> On-chain identity for everyone — no MetaMask, no seed phrase, no friction.
+# KLIPP — On-Chain Identity for the Real World
 
-**KLIPP** is a three-layer identity platform built for the [Arbitrum Open House Buildathon](https://arbitrum-london.hackquest.io).
+### Business card. Verified credentials. Tokenized equity. All on one chain.<br/>Sign up with email — no MetaMask required.
 
-Sign up with email or Google → embedded wallet provisioned automatically → carry your networking card, verified credentials, and tokenized equity in one app.
+[![Live Demo](https://img.shields.io/badge/Live%20Demo-klipp--bay.vercel.app-FFD700?style=for-the-badge&logo=vercel&logoColor=black)](https://klipp-bay.vercel.app)
+[![GitHub](https://img.shields.io/badge/GitHub-yellowwhalelabs%2Fklipp-181717?style=for-the-badge&logo=github)](https://github.com/yellowwhalelabs/klipp)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)](#license)
+
+[![Arbitrum Sepolia](https://img.shields.io/badge/Arbitrum%20Sepolia-deployed-2D374B?style=flat-square&logo=arbitrum)](https://sepolia.arbiscan.io/address/0xcD238464cFE2901aF24e6d77585a19C2064Ca62A)
+[![Robinhood Chain](https://img.shields.io/badge/Robinhood%20Chain%2046630-deployed-8B5CF6?style=flat-square)](https://explorer.testnet.chain.robinhood.com/address/0xC9DCf36D93a12F6F2D991496feB9780e13B57142)
+[![Stylus](https://img.shields.io/badge/Arbitrum-Stylus%20(Rust)-FF6B35?style=flat-square)](https://arbitrum.io/stylus)
+
+</div>
 
 ---
 
-## Live Demo
+## What is KLIPP?
 
-🚀 **[klipp.vercel.app](https://klipp.vercel.app)** *(coming soon)*
+KLIPP is a three-layer on-chain identity app built for the **Arbitrum Open House Buildathon**. A user signs up with **just an email** — KLIPP provisions a real Ethereum wallet behind the scenes (via Privy), sponsors the gas, and mints them a soulbound identity card. No MetaMask. No seed phrase. No gas screen. From login to on-chain identity in under 30 seconds.
 
-📹 Demo video · 📣 Pitch video
+> 🚀 **Live:** [klipp-bay.vercel.app](https://klipp-bay.vercel.app)
 
 ---
 
 ## The Three Layers
 
-| Layer | Contract | Chain | What it does |
-|---|---|---|---|
-| **KLIPP Card** | `KLIPPCard.sol` | Arbitrum Sepolia | Free soulbound ERC-721 — your on-chain business card |
-| **KLIPP Pro Card** | `KLIPPProCard.sol` | Arbitrum Sepolia | EIP-712 verified credentials from employers & schools |
-| **KLIPP Equity Card** | `EquityToken` + `CapTable` + `KLIPPVesting` (Rust/Stylus) | Robinhood Chain Testnet | Tokenized equity with cliff/linear vesting — 60–74% cheaper gas via Stylus |
+### Layer 1 — KLIPP Card 🪪
+Your base identity: a **soulbound (non-transferable) NFT** on Arbitrum Sepolia. Display name, avatar, and bio — your on-chain business card. One card per wallet, permanently yours.
+
+### Layer 2 — KLIPP Pro 🎓
+**Verified credentials**: EIP-712 signed claims from employers, schools, and certificate issuers, attached to your identity. Prove who you are and what you've done, cryptographically.
+
+### Layer 3 — KLIPP Equity 📈
+**Tokenized equity with vesting** — and the vesting math runs **on-chain in Rust** via an **Arbitrum Stylus** contract deployed to Robinhood Chain. Founders issue grants; the contract computes vested amounts live from the block timestamp.
 
 ---
 
-## No MetaMask Required
+## Architecture
 
-KLIPP uses **Privy embedded wallets** so end users never see a seed phrase or install an extension:
+<div align="center"><img src="docs/architecture.svg" alt="KLIPP architecture" width="900"></div>
 
-1. Click "Sign in"
-2. Pick email, Google, Apple, or passkey
-3. Wallet auto-provisioned behind the scenes
-4. Mint, claim, and share — all gasless on testnet
+```mermaid
+flowchart LR
+    User([User])
+    Privy[Privy<br/>Embedded Wallet<br/>email and passkey]
+    Web[Next.js 14<br/>on Vercel]
+    Supa[(Supabase<br/>Postgres · Storage<br/>Edge Functions)]
+
+    User --> Privy --> Web
+    Web <--> Supa
+
+    subgraph AS[Arbitrum Sepolia 421614]
+        Card[KLIPPCard<br/>soulbound NFT]
+        Pro[KLIPPProCard<br/>credentials]
+        VestA[KLIPPVesting star<br/>Stylus / Rust]
+    end
+
+    subgraph RH[Robinhood Chain 46630]
+        Factory[EquityTokenFactory]
+        Cap[CapTable]
+        VestR[KLIPPVesting star<br/>Stylus / Rust]
+    end
+
+    Web -->|mint and read| AS
+    Web -->|equity and vesting| RH
+
+    classDef arb fill:#2D374B,stroke:#28A0F0,color:#fff;
+    classDef rh fill:#3b1d63,stroke:#8B5CF6,color:#fff;
+    classDef star fill:#3a2f00,stroke:#FFD700,color:#FFD700;
+    class Card,Pro arb;
+    class Factory,Cap rh;
+    class VestA,VestR star;
+```
 
 ---
 
@@ -41,139 +80,104 @@ KLIPP uses **Privy embedded wallets** so end users never see a seed phrase or in
 
 | Layer | Technology |
 |---|---|
-| Frontend | Next.js 14 (App Router) + Tailwind CSS |
-| Embedded wallet | Privy In-App Wallets + ERC-4337 |
-| Smart accounts | Privy + Wagmi + viem |
-| Solidity contracts | Foundry + OpenZeppelin |
-| Vesting contract | **Arbitrum Stylus (Rust)** ⭐ |
-| Database | Supabase (Postgres + RLS) |
-| Hosting | Vercel |
-| Chains | Arbitrum Sepolia + Robinhood Chain Testnet |
+| **Frontend** | Next.js 14 (App Router), React 18, TypeScript, Tailwind CSS, Framer Motion |
+| **Auth & wallets** | Privy embedded wallets (email / passkey), `showWalletUIs: false` for one-click txs |
+| **Chain access** | viem, wagmi, `@privy-io/wagmi` |
+| **Backend** | Supabase — Postgres (profiles, funded_wallets), Storage (card images), Edge Functions |
+| **Smart contracts (Solidity)** | KLIPPCard, KLIPPProCard, EquityTokenFactory, CapTable |
+| **Smart contracts (Rust)** | KLIPPVesting — **Arbitrum Stylus**, compiled Rust → WASM |
+| **Gasless UX** | Server-side faucet (`/api/fund-wallet`) tops up embedded wallets invisibly |
+| **Infra / CI** | Vercel (hosting + preview deploys), GitHub Actions (Stylus build/deploy, grant seeding) |
 
 ---
 
-## Why Stylus? 🦀
+## Deployed Contracts
 
-The equity vesting contract (`contracts/stylus/vesting/`) is written in **Rust** and compiled to WebAssembly via **Arbitrum Stylus**. Here's why that matters for KLIPP:
+### Arbitrum Sepolia (chain `421614`)
 
-### Gas savings: 40–90% cheaper vesting math
-
-Every `claimVested()` call computes `totalAmount × elapsed / duration` — pure arithmetic. The EVM opcode stack adds overhead around every integer operation; WebAssembly executes the same math with tighter native instructions.
-
-| Operation | Solidity (MockVesting) | Stylus (KLIPPVesting) | Savings |
-|-----------|----------------------|----------------------|---------|
-| `vestedAmount` (view) | ~8,200 gas | ~2,100 gas | **74%** |
-| `createGrant` (write) | ~55,000 gas | ~22,000 gas | **60%** |
-
-> Based on Offchain Labs Stylus benchmarks for arithmetic-heavy contracts.
-
-### Overflow safety by default
-
-Rust's `saturating_mul` / `saturating_div` prevent silent overflow bugs at the type level — there's no `unchecked` block to forget. The math function `compute_vested` passes **17 unit tests** covering every edge case (cliff, linear, overflow, zero-duration, past-end).
-
-### Same ABI, zero Solidity changes
-
-`KLIPPVesting` exports the **exact same `IVesting` interface** as `MockVesting.sol`. The `CapTable` Solidity contract calls it identically — just swap the address. No frontend changes required.
-
-### Tests run on any machine — no toolchain needed
-
-```bash
-cd contracts/stylus/vesting
-cargo test --no-default-features
-# running 17 tests ... 17 passed; 0 failed ✅
-```
-
-### WASM deployment via Docker
-
-```bash
-cd contracts/stylus/vesting
-docker build -t klipp-vesting .
-
-# Validate WASM
-docker run --rm klipp-vesting check \
-  --endpoint https://sepolia-rollup.arbitrum.io/rpc
-
-# Deploy
-docker run --rm klipp-vesting deploy \
-  --endpoint https://sepolia-rollup.arbitrum.io/rpc \
-  --private-key $DEPLOYER_PRIVATE_KEY
-```
-
----
-
-## Contract Addresses
-
-### Arbitrum Sepolia (chainId 421614)
-| Contract | Address | Verified |
+| Contract | Address | Explorer |
 |---|---|---|
-| KLIPPCard | [`0xcD238464cFE2901aF24e6d77585a19C2064Ca62A`](https://arbitrum-sepolia.blockscout.com/address/0xcD238464cFE2901aF24e6d77585a19C2064Ca62A) | ✅ Sourcify |
-| KLIPPProCard | [`0x1a8F98b493d6c66d255536701c4Eb7E6553e288C`](https://arbitrum-sepolia.blockscout.com/address/0x1a8F98b493d6c66d255536701c4Eb7E6553e288C) | ✅ Sourcify |
-| KLIPPVesting (Stylus) | *Deploying — awaiting `go`* | — |
+| KLIPPCard | `0xcD238464cFE2901aF24e6d77585a19C2064Ca62A` | [Arbiscan](https://sepolia.arbiscan.io/address/0xcD238464cFE2901aF24e6d77585a19C2064Ca62A) |
+| KLIPPProCard | `0x1a8F98b493d6c66d255536701c4Eb7E6553e288C` | [Arbiscan](https://sepolia.arbiscan.io/address/0x1a8F98b493d6c66d255536701c4Eb7E6553e288C) |
+| KLIPPVesting (Stylus) ⭐ | `0xAce3a7b296E41B03bC77e91D2a0375B4Ea279B80` | [Arbiscan](https://sepolia.arbiscan.io/address/0xAce3a7b296E41B03bC77e91D2a0375B4Ea279B80) |
 
-### Robinhood Chain Testnet (Chain ID: 46630)
-| Contract | Address |
-|---|---|
-| EquityToken | *TBD after Stylus deploy* |
-| CapTable | *TBD after Stylus deploy* |
+### Robinhood Chain Testnet (chain `46630`)
+
+| Contract | Address | Explorer |
+|---|---|---|
+| KLIPPVesting (Stylus) ⭐ | `0xC9DCf36D93a12F6F2D991496feB9780e13B57142` | [Blockscout](https://explorer.testnet.chain.robinhood.com/address/0xC9DCf36D93a12F6F2D991496feB9780e13B57142) |
+| EquityTokenFactory | `0xcD238464cFE2901aF24e6d77585a19C2064Ca62A` | [Blockscout](https://explorer.testnet.chain.robinhood.com/address/0xcD238464cFE2901aF24e6d77585a19C2064Ca62A) |
+| CapTable | `0x5e9bb5A815d2D6A81CAb1160f0A3b8BA35b4313D` | [Blockscout](https://explorer.testnet.chain.robinhood.com/address/0x5e9bb5A815d2D6A81CAb1160f0A3b8BA35b4313D) |
+
+> Source of truth: [`deployments/sepolia.json`](deployments/sepolia.json) and [`deployments/robinhood-testnet.json`](deployments/robinhood-testnet.json).
 
 ---
 
-## Architecture
+## Why Stylus?
 
-```mermaid
-graph TB
-    User[End User\nemail/Google/passkey] --> SignIn[Privy Sign In]
-    SignIn --> Wallet[Embedded Wallet\nSmart Account ERC-4337]
-    Wallet --> Frontend[Next.js on Vercel]
-    Frontend --> Supabase[(Supabase: Profiles + Storage)]
-    Frontend --> ArbSepolia[Arbitrum Sepolia]
-    Frontend --> RobinhoodChain[Robinhood Chain Testnet]
-    ArbSepolia --> SC1[KLIPPCard]
-    ArbSepolia --> SC2[KLIPPProCard]
-    RobinhoodChain --> SC3[EquityToken]
-    RobinhoodChain --> SC4[CapTable]
-    RobinhoodChain --> SC5[Vesting — Stylus/Rust ⭐]
-```
+KLIPP's vesting engine is written in **Rust** and deployed with **Arbitrum Stylus** — the same EVM state, executed in a WASM runtime alongside the EVM.
+
+- **Cheaper gas.** Stylus contracts can be **~40–90% cheaper** on compute-heavy logic than the Solidity equivalent. Vesting math — multiply/divide over large token amounts on a time curve — is exactly the kind of arithmetic that benefits.
+- **Newest Arbitrum tech.** Stylus is Arbitrum's frontier runtime; KLIPP uses it for the layer where performance and cost matter most.
+- **Live, verifiable, on-chain math.** `vestedAmount(grantId, timestamp)` recomputes from the current block timestamp on every read — the vested figure visibly ticks up in the UI, not a cached snapshot.
+- Among the **first Stylus deployments on Robinhood Chain** (46630), proving the same Rust contract ships unchanged across Arbitrum-Orbit chains.
+
+---
+
+## Test Coverage
+
+| Suite | Result |
+|---|---|
+| Solidity contracts (Foundry) | **37 / 37 passing** ✅ |
+| Rust / Stylus vesting (`cargo test`) | **17 / 17 passing** ✅ |
+
+Rust unit tests cover the pure `compute_vested` routine (cliff, linear, pre-start, overflow, zero-duration, past-end) and run on any host with no Stylus toolchain.
 
 ---
 
 ## Local Setup
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/klipp
+# 1. Clone
+git clone https://github.com/yellowwhalelabs/klipp.git
 cd klipp
-cp .env.example .env.local   # fill in your credentials
+
+# 2. Install (pnpm workspace)
 pnpm install
-pnpm dev
+
+# 3. Configure env
+cp apps/web/.env.example apps/web/.env.local
+#   then fill in: NEXT_PUBLIC_PRIVY_APP_ID, Supabase keys,
+#   contract addresses, and DEPLOYER_PRIVATE_KEY (server-only)
+
+# 4. Run the web app
+pnpm --filter web dev          # http://localhost:3000
+
+# 5a. Solidity tests (Foundry)
+forge test --root contracts/solidity
+
+# 5b. Rust / Stylus vesting tests (no toolchain needed)
+cargo test --manifest-path contracts/stylus/vesting/Cargo.toml --no-default-features
 ```
 
-### Smart Contracts
+Requires Node ≥ 20, pnpm 9, Rust 1.90 (for Stylus), and Foundry.
 
-```bash
-cd contracts/solidity
-forge install
-forge test
-forge script script/Deploy.s.sol --rpc-url arbitrum_sepolia --broadcast
-```
+---
 
-### Stylus Contract
+## Roadmap
 
-```bash
-cd contracts/stylus/vesting
-cargo stylus check
-cargo stylus deploy --rpc-url https://rpc.testnet.chain.robinhood.com
-```
+- **Phase 1 — Buildathon (done ✅)** — Email onboarding + embedded wallets, soulbound KLIPP Card, gasless minting, Rust/Stylus vesting deployed on Arbitrum Sepolia **and** Robinhood Chain, live equity dashboard reading on-chain vesting.
+- **Phase 2 — Mainnet** — Ship to Arbitrum One + a production Stylus chain, real EIP-712 credential issuers, token-backed vesting with on-chain `claim()`, and account recovery.
+- **Phase 3 — Secondary market** — Compliant secondary market for vested equity, a credential marketplace, and org/cap-table tooling for founders.
 
 ---
 
 ## Team
 
-Built for the Arbitrum Open House Buildathon (May 25 – June 10, 2026).
+**Muthu Selvan** — design, full-stack, smart contracts. ([Yellow Whale Labs](https://github.com/yellowwhalelabs))
 
 ---
 
 ## License
 
-MIT
-
-<!-- build: force fresh Vercel build to pick up env vars — 2026-06-07T06:53:29Z -->
+Released under the **MIT License**. See [`LICENSE`](LICENSE).
