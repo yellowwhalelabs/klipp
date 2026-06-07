@@ -91,6 +91,51 @@ jobs:
       - name: cargo stylus check (WASM validation)
         run: cargo stylus check --features contract --endpoint ${{ env.RPC_URL }}
 
+      - name: Pre-deploy estimate — gas + predicted address (NO broadcast)
+        # Runs on EVERY run (including dry_run=true) so the predicted address and
+        # gas cost are visible in the job summary before approving a real deploy.
+        # --estimate-gas only simulates; it never sends a transaction.
+        env:
+          DEPLOYER_KEY: ${{ secrets.DEPLOYER_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+          KEYFILE="$(mktemp "$RUNNER_TEMP/deployer.XXXXXX.key")"
+          chmod 600 "$KEYFILE"
+          cleanup() { shred -u "$KEYFILE" 2>/dev/null || rm -f "$KEYFILE"; }
+          trap cleanup EXIT
+          printf '%s' "$DEPLOYER_KEY" > "$KEYFILE"
+
+          # --no-verify: skip cargo-stylus's Docker reproducible rebuild (not
+          # available in the runner). --estimate-gas: simulate only, no broadcast.
+          EST_OUT="$(cargo stylus deploy \
+                --features contract \
+                --endpoint "${RPC_URL}" \
+                --private-key-path "$KEYFILE" \
+                --no-verify \
+                --estimate-gas 2>&1 || true)"
+          EST_CLEAN="$(printf '%s' "$EST_OUT" | sed -E 's/\x1b\[[0-9;]*m//g')"
+          PREDICTED_ADDR=$(printf '%s' "$EST_CLEAN" | grep -oiE 'deployed code at address:?[[:space:]]*0x[0-9a-fA-F]{40}' | grep -oiE '0x[0-9a-fA-F]{40}' | head -1 || true)
+          GAS_ESTIMATE=$(printf '%s' "$EST_CLEAN" | grep -oiE 'gas[^0-9]{0,30}[0-9]{4,}' | grep -oE '[0-9]{4,}' | tail -1 || true)
+          {
+            echo "## KLIPPVesting — pre-deploy estimate"
+            echo "- **Network**: ${{ inputs.network }}"
+            echo "- **RPC endpoint**: ${RPC_URL}"
+            echo "- **Predicted address**: \`${PREDICTED_ADDR:-see raw output below}\`"
+            echo "- **Gas estimate**: ${GAS_ESTIMATE:-see raw output below}"
+            echo ""
+            echo "<details><summary>raw estimate output</summary>"
+            echo ""
+            echo '```'
+            printf '%s\n' "$EST_CLEAN" | sed -E 's/[0-9a-fA-F]{64}/<redacted64>/g'
+            echo '```'
+            echo "</details>"
+          } >> "$GITHUB_STEP_SUMMARY"
+          echo "Predicted address: ${PREDICTED_ADDR:-<unparsed>}"
+          echo "Gas estimate: ${GAS_ESTIMATE:-<unparsed>}"
+          echo "----- estimate output (64-hex redacted) -----"
+          printf '%s\n' "$EST_CLEAN" | sed -E 's/[0-9a-fA-F]{64}/<redacted64>/g'
+          echo "----- end estimate output -----"
+
       - name: cargo stylus deploy
         # dry_run is a boolean input; when dispatched it arrives as boolean `true`,
         # so comparing only against the string 'true' (`!= 'true'`) wrongly let this
@@ -115,36 +160,10 @@ jobs:
           trap cleanup EXIT
           printf '%s' "$DEPLOYER_KEY" > "$KEYFILE"
 
-          # ── 1) Gas estimate + predicted address (NO broadcast) ──────────────
-          # --estimate-gas only simulates; it does not send a transaction. We
-          # surface the prediction in the job summary BEFORE broadcasting so the
-          # cost is visible up front.
-          # --no-verify: skip cargo-stylus's Docker-based reproducible rebuild
-          # (not available in this runner — fails with "os error 2"); deploy the
-          # wasm we just built and validated with `cargo stylus check`.
-          EST_OUT="$(cargo stylus deploy \
-                --features contract \
-                --endpoint "${RPC_URL}" \
-                --private-key-path "$KEYFILE" \
-                --no-verify \
-                --estimate-gas 2>&1 || true)"
-          GAS_ESTIMATE=$(printf '%s' "$EST_OUT" | grep -oiE 'gas[^0-9]{0,24}[0-9][0-9,_]*' | grep -oE '[0-9][0-9,_]*' | tail -1 || true)
-          PREDICTED_ADDR=$(printf '%s' "$EST_OUT" | grep -oiP '0x[0-9a-fA-F]{40}(?![0-9a-fA-F])' | head -1 || true)
-          {
-            echo "## KLIPPVesting — pre-deploy estimate (${{ inputs.network }})"
-            echo "- **Predicted address**: \`${PREDICTED_ADDR:-<unparsed>}\`"
-            echo "- **Gas estimate**: ${GAS_ESTIMATE:-<unparsed>}"
-            echo ""
-          } >> "$GITHUB_STEP_SUMMARY"
-          echo "Predicted address: ${PREDICTED_ADDR:-<unparsed>}"
-          echo "Gas estimate: ${GAS_ESTIMATE:-<unparsed>}"
-          # Diagnostic: surface the estimate output with any 64-hex run masked
-          # (covers a private key and tx hashes; GitHub also auto-masks secrets).
-          echo "----- estimate output (64-hex redacted) -----"
-          printf '%s\n' "$EST_OUT" | sed -E 's/[0-9a-fA-F]{64}/<redacted64>/g'
-          echo "----- end estimate output -----"
-
-          # ── 2) Real deploy (BROADCASTS the transaction), with retry ─────────
+          # ── Real deploy (BROADCASTS the transaction), with retry ────────────
+          # The gas estimate + predicted address are produced by the separate
+          # "Pre-deploy estimate" step above (which also runs on dry runs), so by
+          # the time we reach here the cost has already been surfaced.
           # Arbitrum Sepolia's base fee oscillates around the ~0.02 gwei maxFee
           # cargo-stylus uses, so a submission can be rejected with "max fee per
           # gas less than block base fee". Retry a few times to catch a dip.
