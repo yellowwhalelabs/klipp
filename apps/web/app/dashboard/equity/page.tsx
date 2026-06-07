@@ -8,8 +8,15 @@ import { motion } from "framer-motion";
 import { createPublicClient, defineChain, formatUnits, http } from "viem";
 import { VestingProgress } from "@/components/VestingProgress";
 import { TrendingUp, ArrowLeft, ExternalLink, Loader2 } from "lucide-react";
-import { toast } from "sonner";
 import { CONTRACTS, KLIPP_VESTING_ABI } from "@/lib/contracts";
+
+// createGrant tx for each demo grant (for the "View on explorer" link).
+const GRANT_TX: Record<string, string> = {
+  "1": "0xe53e39045783d7705a53eb926a97a906161ba1d5eafee59beddd849de794cbb0",
+  "2": "0x1173a42dd1cee133bc06684b4936af9cc3b3be2a7aefb02fe8ac4c3395be7024",
+  "3": "0x43c7abff6dc4030f6cd1c7008591261c616c8260bbb3f26400cba7df80a2aa88",
+};
+const RH_EXPLORER = "https://explorer.testnet.chain.robinhood.com";
 
 // Robinhood Chain Testnet (defined inline to avoid pulling providers.tsx's
 // module-level wagmi/query-client side effects into this page).
@@ -115,17 +122,6 @@ export default function EquityDashboardPage() {
     };
   }, [authenticated]);
 
-  async function handleClaim(_grantId: bigint) {
-    toast.promise(
-      new Promise((r) => setTimeout(r, 2000)), // TODO: wire claim() when added
-      {
-        loading: "Claiming vested tokens via Stylus…",
-        success: "Tokens claimed! 🎉",
-        error: "Claim failed. Try again.",
-      }
-    );
-  }
-
   if (!ready || !authenticated) return null;
 
   return (
@@ -208,13 +204,16 @@ export default function EquityDashboardPage() {
                   durationSeconds={g.durationSeconds}
                 />
 
-                {g.claimable > 0n && (
-                  <button
-                    onClick={() => handleClaim(g.grantId)}
-                    className="w-full py-2.5 bg-purple-600 hover:bg-purple-500 text-white font-semibold rounded-xl transition-colors"
+                {GRANT_TX[g.grantId.toString()] && (
+                  <a
+                    href={`${RH_EXPLORER}/tx/${GRANT_TX[g.grantId.toString()]}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="w-full py-2.5 border border-purple-500/50 text-purple-300 hover:bg-purple-500/10 font-semibold rounded-xl transition-colors flex items-center justify-center gap-2"
                   >
-                    Claim vested tokens →
-                  </button>
+                    View on explorer
+                    <ExternalLink className="w-4 h-4" />
+                  </a>
                 )}
               </motion.div>
             ))}
