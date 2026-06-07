@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { createPublicClient, defineChain, http } from "viem";
+import { createPublicClient, defineChain, formatUnits, http } from "viem";
 import { VestingProgress } from "@/components/VestingProgress";
 import { TrendingUp, ArrowLeft, ExternalLink, Loader2 } from "lucide-react";
 import { toast } from "sonner";
@@ -35,6 +35,10 @@ const robinhoodClient = createPublicClient({
 // The Stylus contract has no per-holder enumeration, so we read known grant ids.
 // Founders issue grants via createGrant; ids start at 1.
 const GRANT_IDS = [1n, 2n, 3n] as const;
+
+// Whole-token count with thousands separators, e.g. 250000n*1e18 → "250,000".
+const fmtTokens = (a: bigint) =>
+  Math.round(Number(formatUnits(a, 18))).toLocaleString("en-US");
 
 type Grant = {
   grantId: bigint;
@@ -187,6 +191,12 @@ export default function EquityDashboardPage() {
                     Active
                   </span>
                 </div>
+
+                <p className="text-sm text-white/70">
+                  <span className="text-yellow-400 font-semibold">{fmtTokens(g.vested)}</span>
+                  {" / "}
+                  {fmtTokens(g.totalAmount)} KLIPP tokens vested
+                </p>
 
                 <VestingProgress
                   totalAmount={g.totalAmount}
