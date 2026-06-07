@@ -1,0 +1,9 @@
+{
+  "name": "klipp-scripts",
+  "private": true,
+  "type": "module",
+  "description": "One-off operational scripts (not part of the pnpm workspace).",
+  "dependencies": {
+    "viem": "2.52.0"
+  }
+}

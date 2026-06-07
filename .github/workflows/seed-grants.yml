@@ -1,0 +1,55 @@
+name: Seed demo grants (KLIPPVesting)
+
+# One-off: seeds demo vesting grants on a deployed KLIPPVesting (Stylus) contract
+# so /dashboard/equity shows live data. Signs with the deployer key from secrets
+# (read into the script via env — never on a command line).
+
+on:
+  workflow_dispatch:
+    inputs:
+      network:
+        description: "Target network"
+        required: true
+        default: "robinhood-testnet"
+        type: choice
+        options:
+          - robinhood-testnet
+          - arbitrum-sepolia
+
+permissions:
+  contents: read
+
+# Never seed twice concurrently (avoids nonce races on the deployer wallet).
+concurrency:
+  group: seed-grants-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  seed:
+    name: Seed grants
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Seed demo grants
+        working-directory: scripts
+        env:
+          DEPLOYER_PRIVATE_KEY: ${{ secrets.DEPLOYER_PRIVATE_KEY }}
+          NETWORK: ${{ inputs.network }}
+        run: |
+          set -euo pipefail
+          if [ "$NETWORK" = "arbitrum-sepolia" ]; then
+            export RPC_URL="https://sepolia-rollup.arbitrum.io/rpc"
+            export CHAIN_ID=421614
+            export CONTRACT="0xAce3a7b296E41B03bC77e91D2a0375B4Ea279B80"
+          else
+            export RPC_URL="https://rpc.testnet.chain.robinhood.com"
+            export CHAIN_ID=46630
+            export CONTRACT="0xC9DCf36D93a12F6F2D991496feB9780e13B57142"
+          fi
+          npm install --silent --no-audit --no-fund
+          node seed-grants.mjs
