@@ -67,6 +67,11 @@ export function Providers({ children }: { children: React.ReactNode }) {
         // configured in the Privy dashboard — re-add them once that's done.
         loginMethods: ["email", "passkey"],
         embeddedWallets: {
+          // Suppress Privy's per-transaction confirmation modal for embedded
+          // wallets so the mint is truly one-click (no "Approve transaction"
+          // popup). The mint is an app-initiated, auto-funded action — there's
+          // nothing for the user to approve.
+          showWalletUIs: false,
           ethereum: {
             createOnLogin: "users-without-wallets",
           },
