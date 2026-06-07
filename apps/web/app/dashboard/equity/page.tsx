@@ -2,40 +2,118 @@
 
 import { usePrivy } from "@privy-io/react-auth";
 import { useRouter } from "next/navigation";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
+import { createPublicClient, defineChain, http } from "viem";
 import { VestingProgress } from "@/components/VestingProgress";
-import { TrendingUp, ArrowLeft, ExternalLink } from "lucide-react";
+import { TrendingUp, ArrowLeft, ExternalLink, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { CONTRACTS, KLIPP_VESTING_ABI } from "@/lib/contracts";
 
-// Demo data — replaced by on-chain reads after deployment
-const DEMO_GRANTS = [
-  {
-    grantId: 1n,
-    company: "BuildFast Inc.",
-    totalAmount: 100_000n * 10n ** 18n,
-    vested: 25_000n * 10n ** 18n,
-    claimed: 10_000n * 10n ** 18n,
-    claimable: 15_000n * 10n ** 18n,
-    vestingStart: Math.floor(Date.now() / 1000) - 365 * 24 * 3600,
-    cliffSeconds: 365 * 24 * 3600,
-    durationSeconds: 4 * 365 * 24 * 3600,
-    active: true,
+// Robinhood Chain Testnet (defined inline to avoid pulling providers.tsx's
+// module-level wagmi/query-client side effects into this page).
+const robinhoodTestnet = defineChain({
+  id: 46630,
+  name: "Robinhood Chain Testnet",
+  nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 },
+  rpcUrls: {
+    default: {
+      http: [
+        process.env.NEXT_PUBLIC_ROBINHOOD_RPC ||
+          "https://rpc.testnet.chain.robinhood.com",
+      ],
+    },
   },
-];
+});
+
+const robinhoodClient = createPublicClient({
+  chain: robinhoodTestnet,
+  transport: http(),
+});
+
+// The Stylus contract has no per-holder enumeration, so we read known grant ids.
+// Founders issue grants via createGrant; ids start at 1.
+const GRANT_IDS = [1n, 2n, 3n] as const;
+
+type Grant = {
+  grantId: bigint;
+  beneficiary: `0x${string}`;
+  totalAmount: bigint;
+  vested: bigint;
+  claimed: bigint;
+  claimable: bigint;
+  vestingStart: number;
+  cliffSeconds: number;
+  durationSeconds: number;
+};
 
 export default function EquityDashboardPage() {
   const { ready, authenticated } = usePrivy();
   const router = useRouter();
+  const [grants, setGrants] = useState<Grant[] | null>(null); // null = loading
 
   useEffect(() => {
     if (ready && !authenticated) router.push("/onboard");
   }, [ready, authenticated, router]);
 
+  // Read live grant state from the deployed KLIPPVesting (Stylus) contract.
+  useEffect(() => {
+    if (!authenticated) return;
+    let cancelled = false;
+
+    (async () => {
+      const vesting = CONTRACTS.VESTING_ROBINHOOD;
+      const now = BigInt(Math.floor(Date.now() / 1000));
+      const found: Grant[] = [];
+
+      for (const grantId of GRANT_IDS) {
+        try {
+          // getGrant reverts with "unknown grant" if the id doesn't exist —
+          // both reads run against the on-chain Stylus contract.
+          const [beneficiary, total, start, cliff, duration, claimed] =
+            await robinhoodClient.readContract({
+              address: vesting,
+              abi: KLIPP_VESTING_ABI,
+              functionName: "getGrant",
+              args: [grantId],
+            });
+
+          // vested is computed on-chain by the Stylus compute_vested routine.
+          const vested = await robinhoodClient.readContract({
+            address: vesting,
+            abi: KLIPP_VESTING_ABI,
+            functionName: "vestedAmount",
+            args: [grantId, now],
+          });
+
+          found.push({
+            grantId,
+            beneficiary,
+            totalAmount: total,
+            vested,
+            claimed,
+            claimable: vested > claimed ? vested - claimed : 0n,
+            vestingStart: Number(start),
+            cliffSeconds: Number(cliff),
+            durationSeconds: Number(duration),
+          });
+        } catch {
+          // id not present (or read failed) — skip it.
+        }
+      }
+
+      if (!cancelled) setGrants(found);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [authenticated]);
+
   async function handleClaim(_grantId: bigint) {
     toast.promise(
-      new Promise((r) => setTimeout(r, 2000)), // TODO: replace with actual tx
+      new Promise((r) => setTimeout(r, 2000)), // TODO: wire claim() when added
       {
         loading: "Claiming vested tokens via Stylus…",
         success: "Tokens claimed! 🎉",
@@ -64,20 +142,25 @@ export default function EquityDashboardPage() {
               Equity Grants
             </h1>
             <p className="text-white/40 text-sm mt-1">
-              Powered by Stylus (Rust) on Robinhood Chain
+              Vesting computed on-chain by Stylus (Rust) on Robinhood Chain
             </p>
           </div>
           <a
-            href="https://explorer.testnet.chain.robinhood.com"
+            href={`https://explorer.testnet.chain.robinhood.com/address/${CONTRACTS.VESTING_ROBINHOOD}`}
             target="_blank"
             rel="noopener noreferrer"
             className="flex items-center gap-1 text-xs text-white/30 hover:text-white/60 transition-colors"
           >
-            Explorer <ExternalLink className="w-3 h-3" />
+            Contract <ExternalLink className="w-3 h-3" />
           </a>
         </div>
 
-        {DEMO_GRANTS.length === 0 ? (
+        {grants === null ? (
+          <div className="text-center py-20 text-white/30">
+            <Loader2 className="w-8 h-8 mx-auto mb-4 animate-spin text-purple-400" />
+            <p className="text-sm">Reading grants from the Stylus contract…</p>
+          </div>
+        ) : grants.length === 0 ? (
           <div className="text-center py-20 text-white/30">
             <TrendingUp className="w-12 h-12 mx-auto mb-4 opacity-30" />
             <p>No equity grants yet.</p>
@@ -85,7 +168,7 @@ export default function EquityDashboardPage() {
           </div>
         ) : (
           <div className="space-y-6">
-            {DEMO_GRANTS.map((g, i) => (
+            {grants.map((g, i) => (
               <motion.div
                 key={g.grantId.toString()}
                 initial={{ opacity: 0, y: 20 }}
@@ -95,15 +178,13 @@ export default function EquityDashboardPage() {
               >
                 <div className="flex items-center justify-between">
                   <div>
-                    <h3 className="font-semibold text-white">{g.company}</h3>
-                    <p className="text-xs text-white/40">Grant #{g.grantId.toString()}</p>
+                    <h3 className="font-semibold text-white">Equity Grant</h3>
+                    <p className="text-xs text-white/40 font-mono">
+                      Grant #{g.grantId.toString()} · {g.beneficiary.slice(0, 6)}…{g.beneficiary.slice(-4)}
+                    </p>
                   </div>
-                  <span className={`text-xs px-2 py-0.5 rounded-full ${
-                    g.active
-                      ? "bg-green-500/10 text-green-400"
-                      : "bg-red-500/10 text-red-400"
-                  }`}>
-                    {g.active ? "Active" : "Revoked"}
+                  <span className="text-xs px-2 py-0.5 rounded-full bg-green-500/10 text-green-400">
+                    Active
                   </span>
                 </div>
 

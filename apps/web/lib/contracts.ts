@@ -21,6 +21,10 @@ export const CONTRACTS = {
 
   VESTING: (process.env.NEXT_PUBLIC_VESTING_ADDRESS ||
     "0x0000000000000000000000000000000000000000") as `0x${string}`,
+
+  // KLIPPVesting (Stylus, Rust) on Robinhood Chain (46630)
+  VESTING_ROBINHOOD: (process.env.NEXT_PUBLIC_VESTING_ADDRESS_ROBINHOOD ||
+    "0x0000000000000000000000000000000000000000") as `0x${string}`,
 } as const;
 
 // Minimal ABIs — enough for frontend interactions
@@ -138,6 +142,47 @@ export const CAP_TABLE_ABI = [
           { name: "active", type: "bool" },
         ],
       },
+    ],
+    stateMutability: "view",
+  },
+] as const;
+
+// KLIPPVesting (Stylus / Rust) — matches the deployed contract's #[public] ABI.
+// stylus-proc camelCases method names, so `get_grant` is exposed as `getGrant`.
+// getGrant returns a FLAT tuple (no struct, no `active` field):
+//   (beneficiary, total, start, cliff, duration, claimed).
+export const KLIPP_VESTING_ABI = [
+  {
+    name: "vestedAmount",
+    type: "function",
+    inputs: [
+      { name: "grantId", type: "uint256" },
+      { name: "currentTime", type: "uint64" },
+    ],
+    outputs: [{ name: "", type: "uint256" }],
+    stateMutability: "view",
+  },
+  {
+    name: "unclaimed",
+    type: "function",
+    inputs: [
+      { name: "grantId", type: "uint256" },
+      { name: "currentTime", type: "uint64" },
+    ],
+    outputs: [{ name: "", type: "uint256" }],
+    stateMutability: "view",
+  },
+  {
+    name: "getGrant",
+    type: "function",
+    inputs: [{ name: "grantId", type: "uint256" }],
+    outputs: [
+      { name: "beneficiary", type: "address" },
+      { name: "total", type: "uint256" },
+      { name: "start", type: "uint256" },
+      { name: "cliff", type: "uint256" },
+      { name: "duration", type: "uint256" },
+      { name: "claimed", type: "uint256" },
     ],
     stateMutability: "view",
   },
