@@ -1,11 +1,11 @@
 "use client";
 
-import { usePrivy, useWallets } from "@privy-io/react-auth";
+import { usePrivy, useWallets, useSendTransaction } from "@privy-io/react-auth";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
-import { createWalletClient, custom, parseEther } from "viem";
+import { encodeFunctionData, parseEther } from "viem";
 import { arbitrumSepolia } from "viem/chains";
 import { usePublicClient } from "wagmi";
 import {
@@ -108,6 +108,7 @@ export default function OnboardPage() {
   // so falling back to user.wallet.address would enable the button before the
   // wallet can actually sign — exactly the "click does nothing" symptom.
   const { wallets } = useWallets();
+  const { sendTransaction } = useSendTransaction();
   const embeddedWallet = wallets.find((w) => w.walletClientType === "privy");
   const walletAddress = (embeddedWallet?.address ?? "") as `0x${string}`;
 
@@ -217,24 +218,28 @@ export default function OnboardPage() {
       };
       const metadataUri = await uploadMetadata(metadata, walletAddress);
 
-      // ── 3. Mint KLIPPCard.mint(metadataUri) from the embedded EOA ─────────
-      // Build a viem wallet client over the Privy embedded wallet's provider and
-      // call mint directly. Gas is paid from the wallet's balance, which the
-      // invisible faucet topped up on load.
+      // ── 3. Mint KLIPPCard.mint(metadataUri) from the embedded wallet ──────
+      // Use Privy's native sendTransaction with `uiOptions.showWalletUIs:false`
+      // so the tx is signed and sent WITHOUT a confirmation popup. (Suppressing
+      // the popup via the raw getEthereumProvider() path hangs — showWalletUIs
+      // only applies to Privy's own send/sign methods, not the EIP-1193
+      // provider.) Gas comes from the wallet balance the faucet topped up.
       setMintStage("submitting");
-      await embeddedWallet.switchChain(arbitrumSepolia.id);
-      const provider = await embeddedWallet.getEthereumProvider();
-      const walletClient = createWalletClient({
-        account:   walletAddress,
-        chain:     arbitrumSepolia,
-        transport: custom(provider),
-      });
-      const hash = await walletClient.writeContract({
-        address:      CONTRACTS.SOULBOUND_CARD,
-        abi:          SOULBOUND_CARD_ABI,
-        functionName: "mint",
-        args:         [metadataUri],
-      });
+      const { hash } = await sendTransaction(
+        {
+          to:      CONTRACTS.SOULBOUND_CARD,
+          data:    encodeFunctionData({
+            abi:          SOULBOUND_CARD_ABI,
+            functionName: "mint",
+            args:         [metadataUri],
+          }),
+          chainId: arbitrumSepolia.id,
+        },
+        {
+          uiOptions: { showWalletUIs: false },
+          address:   walletAddress,
+        }
+      );
 
       setTxHash(hash);
 
