@@ -218,21 +218,45 @@ export default function OnboardPage() {
       };
       const metadataUri = await uploadMetadata(metadata, walletAddress);
 
-      // ── 3. Mint KLIPPCard.mint(metadataUri) from the embedded wallet ──────
+      // ── 3. Mint or update the KLIPPCard from the embedded wallet ──────────
+      // The card is a soulbound, one-per-wallet NFT: calling mint() a second
+      // time reverts with AlreadyHasCard, which fails gas estimation so the tx
+      // never sends — the classic "stuck on Minting…" symptom for a re-mint.
+      // So first check whether this wallet already owns a card; if it does, we
+      // call updateMetadata(tokenId, newURI) instead of mint().
+      //
       // Use Privy's native sendTransaction with `uiOptions.showWalletUIs:false`
       // so the tx is signed and sent WITHOUT a confirmation popup. (Suppressing
       // the popup via the raw getEthereumProvider() path hangs — showWalletUIs
       // only applies to Privy's own send/sign methods, not the EIP-1193
       // provider.) Gas comes from the wallet balance the faucet topped up.
       setMintStage("submitting");
-      const { hash } = await sendTransaction(
-        {
-          to:      CONTRACTS.SOULBOUND_CARD,
-          data:    encodeFunctionData({
+
+      const existingTokenId = (await publicClient!.readContract({
+        address:      CONTRACTS.SOULBOUND_CARD,
+        abi:          SOULBOUND_CARD_ABI,
+        functionName: "cardOf",
+        args:         [walletAddress],
+      })) as bigint;
+
+      const isUpdate = existingTokenId > 0n;
+
+      const data = isUpdate
+        ? encodeFunctionData({
+            abi:          SOULBOUND_CARD_ABI,
+            functionName: "updateMetadata",
+            args:         [existingTokenId, metadataUri],
+          })
+        : encodeFunctionData({
             abi:          SOULBOUND_CARD_ABI,
             functionName: "mint",
             args:         [metadataUri],
-          }),
+          });
+
+      const { hash } = await sendTransaction(
+        {
+          to:      CONTRACTS.SOULBOUND_CARD,
+          data,
           chainId: arbitrumSepolia.id,
         },
         {
@@ -274,7 +298,7 @@ export default function OnboardPage() {
 
       // ── 7. Done ──────────────────────────────────────────────────────────
       setStep("done");
-      toast.success("KLIPP Card minted! 🎉");
+      toast.success(isUpdate ? "KLIPP Card updated! 🎉" : "KLIPP Card minted! 🎉");
       setTimeout(() => router.push("/dashboard"), 2500);
     } catch (err: unknown) {
       console.error("MINT ERROR:", err);
